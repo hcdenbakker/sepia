@@ -1,2 +1,2 @@
-# taxon_boom
-taxonomic read classifier using compact hash table and minimal perfect hashing
+# Sepia
+taxonomic read classifier using using kraken2 algorithms and more...
