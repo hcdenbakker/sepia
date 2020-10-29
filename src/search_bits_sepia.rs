@@ -1067,6 +1067,8 @@ pub fn per_read_stream_pe(
     let mut results_ratios: HashMap<u32, f64> = HashMap::new();
     let mut final_counts: HashMap<u32, usize> = HashMap::new(); //actually counts of minimizers
     let mut hll_map: HashMap<u32, HyperLogLog<u64>> = HashMap::new();
+    let mut hll_map_taxon: HashMap<u32, HyperLogLog<u64>> = HashMap::new();
+    let mut final_counts_taxon: HashMap<u32, usize> = HashMap::new(); //actually counts of minimizers
     let mut reader1 = parse_fastx_file(&filenames[0]).expect("invalid path/file");
     let mut reader2 = parse_fastx_file(&filenames[1]).expect("invalid path/file");
     while let Some(record1) = reader1.next() {
@@ -1114,11 +1116,19 @@ pub fn per_read_stream_pe(
             eprint!("{} read pairs classified\r", read_count);
             for id in c {
                 *results_counts.entry(id.1).or_insert(0) += 1;
+                *final_counts_taxon.entry(id.1).or_insert(0) += id.5.len();
                 for c in id.4 {
                     *final_counts.entry(c.0).or_insert(0) += c.1;
                 }
                 if hll {
                     for f in &id.5 {
+                        if hll_map_taxon.contains_key(&id.1) {
+                            hll_map_taxon.get_mut(&id.1).unwrap().insert(&f.1);
+                        } else {
+                            let mut hllp = HyperLogLog::new(0.001);
+                            hllp.insert(&f.1);
+                            hll_map_taxon.insert(id.1, hllp);
+                        }
                         if hll_map.contains_key(&f.0) {
                             hll_map.get_mut(&f.0).unwrap().insert(&f.1);
                         } else {
@@ -1152,11 +1162,19 @@ pub fn per_read_stream_pe(
     eprint!("{} read pairs classified\r", read_count);
     for id in c {
         *results_counts.entry(id.1).or_insert(0) += 1;
+        *final_counts_taxon.entry(id.1).or_insert(0) += id.5.len();
         for c in id.4 {
             *final_counts.entry(c.0).or_insert(0) += c.1;
         }
         if hll {
             for f in &id.5 {
+                if hll_map_taxon.contains_key(&id.1) {
+                            hll_map_taxon.get_mut(&id.1).unwrap().insert(&f.1);
+                        } else {
+                            let mut hllp = HyperLogLog::new(0.001);
+                            hllp.insert(&f.1);
+                            hll_map_taxon.insert(id.1, hllp);
+                        }
                 if hll_map.contains_key(&f.0) {
                     hll_map.get_mut(&f.0).unwrap().insert(&f.1);
                 } else {
@@ -1199,22 +1217,40 @@ pub fn per_read_stream_pe(
     }
     let mut file =
         File::create(format!("{}_summary.txt", prefix)).expect("could not create outfile!");
-    for (key, value) in results_counts {
+        for (key, value) in results_counts {
         if final_counts.contains_key(&key) {
             if hll {
-                file.write_all(
-                    format!(
-                        "{}\t{}\t{:.3}\t{}\t{}\t{:.3}\n",
-                        taxonomy[&key],
-                        value,
-                        results_ratios[&key] / value as f64,
-                        final_counts[&key],
-                        hll_map[&key].len().trunc() as usize,
-                        final_counts[&key] as f64 / hll_map[&key].len()
+                if hll_map_taxon.contains_key(&key) {
+                    file.write_all(
+                        format!(
+                            "{}\t{}\t{:.3}\t{}\t{}\t{:.3}\t{}\t{:.3}\n",
+                            taxonomy[&key],
+                            value,
+                            results_ratios[&key] / value as f64,
+                            final_counts[&key],
+                            hll_map[&key].len().trunc() as usize,
+                            final_counts[&key] as f64 / hll_map[&key].len(),
+                            hll_map_taxon[&key].len().trunc() as usize,
+                            final_counts_taxon[&key] as f64 / hll_map_taxon[&key].len(),
+                        )
+                        .as_bytes(),
                     )
-                    .as_bytes(),
-                )
-                .expect("could not write results!");
+                    .expect("could not write results!");
+                } else {
+                    file.write_all(
+                        format!(
+                            "{}\t{}\t{:.3}\t{}\t{}\t{:.3}\tNA\tNA\n",
+                            taxonomy[&key],
+                            value,
+                            results_ratios[&key] / value as f64,
+                            final_counts[&key],
+                            hll_map[&key].len().trunc() as usize,
+                            final_counts[&key] as f64 / hll_map[&key].len(),
+                        )
+                        .as_bytes(),
+                    )
+                    .expect("could not write results!");
+                }
             } else {
                 file.write_all(
                     format!(
@@ -1252,7 +1288,7 @@ pub fn per_read_stream_pe(
                 .expect("could not write results!");
             }
         }
-    }
+    }        
 }
 
 #[allow(unused_assignments)]
