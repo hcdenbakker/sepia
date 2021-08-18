@@ -41,7 +41,7 @@ fn main() {
                     )
                     .arg(
                         Arg::with_name("ref_file")
-                            .help("Sets the input file to use")
+                            .help("Sets the reference file to use; this is a tab delimited file with two columns; the first column contains the path to the file, the second the associated lineage (see ref_demo.txt)")
                             .required(true)
                             .short("r")
                             .takes_value(true)
