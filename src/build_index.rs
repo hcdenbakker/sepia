@@ -597,7 +597,7 @@ pub fn build_db_bits_parallel_sepia(
     let mut vec = Vec::with_capacity(batch);
     for accession in accessions {
         let accession_plus_root = "root;".to_owned() + &accession[1];
-        let accession_lineage = lookup[&accession_plus_root]; //now a u32, original when we have complete taxonomy_string
+        let accession_lineage  = lookup.get(&accession_plus_root).expect(&format!("Could not find {} in lookup hash", &accession_plus_root));
         vec.push((accession_lineage, accession[0].to_owned()));
         if vec.len() % batch == 0 {
             let mut out_vec: Vec<_> = vec![];
@@ -705,3 +705,4 @@ pub fn build_db_bits_parallel_sepia(
     eprintln!("processed {}/{} accessions", processed, map_length);
     db
 }
+

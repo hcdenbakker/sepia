@@ -547,7 +547,7 @@ pub fn parallel_vec_sepia(
 
 #[allow(unused_assignments)]
 pub fn parallel_vec_sepia_pre_hll(
-    vec: &[(String, String)],
+    vec: &[(String, String, usize)],
     db: &[u32],
     taxonomy: &HashMap<u32, String>,
     lineage_graph: &HashMap<u32, u32>,
@@ -561,6 +561,7 @@ pub fn parallel_vec_sepia_pre_hll(
     usize,
     std::vec::Vec<(u32, usize)>,
     std::vec::Vec<(u32, u64)>,
+    usize,
 )> {
     let my_db: Arc<&[u32]> = Arc::new(db);
     let mut out_vec: Vec<_> = vec![];
@@ -578,6 +579,7 @@ pub fn parallel_vec_sepia_pre_hll(
                     observations,
                     report,
                     kmer_info,
+                    r.2.to_owned(),//length
                 )
             } else {
                 let classification =
@@ -589,6 +591,7 @@ pub fn parallel_vec_sepia_pre_hll(
                     classification.2.to_owned(),
                     report,
                     kmer_info,
+                    r.2.to_owned(),//length
                 )
             }
             // }
@@ -826,6 +829,7 @@ pub fn per_read_stream_se(
     //let mut results = Vec::new();
     let mut results: Vec<u8> = Vec::new();
     let mut results_counts: HashMap<u32, usize> = HashMap::new();
+    let mut results_total_length: HashMap<u32, usize> = HashMap::new();
     let mut results_ratios: HashMap<u32, f64> = HashMap::new();
     let mut hll_map: HashMap<u32, HyperLogLog<u64>> = HashMap::new();
     let mut final_counts: HashMap<u32, usize> = HashMap::new(); //actually counts of minimizers
@@ -837,11 +841,13 @@ pub fn per_read_stream_se(
     let mut read_count = 0;
     while let Some(record1) = reader1.next() {
         let seqrec1 = record1.expect("invalid record in forward file");
+        let seqrec1_length = seqrec1.seq().len();
         read_count += 1;
         if qual_offset == 0 {
             vec.push((
                 str::from_utf8(seqrec1.id()).unwrap().to_string(),
                 str::from_utf8(&seqrec1.seq()).unwrap().to_string(),
+                seqrec1_length,
             ));
         } else {
             vec.push((
@@ -853,6 +859,7 @@ pub fn per_read_stream_se(
                         .to_string(),
                     qual_offset,
                 ),
+                seqrec1_length,
             ))
         }
         if read_count % batch_size == 0 {
@@ -868,6 +875,7 @@ pub fn per_read_stream_se(
             eprint!("{} reads classified\r", read_count);
             for id in c {
                 *results_counts.entry(id.1).or_insert(0) += 1;
+                *results_total_length.entry(id.1).or_insert(0) += id.6;
                 *final_counts_taxon.entry(id.1).or_insert(0) += id.5.len();
                 for c in id.4 {
                     *final_counts.entry(c.0).or_insert(0) += c.1;
@@ -928,6 +936,7 @@ pub fn per_read_stream_se(
     //results.append(&mut c);
     for id in c {
         *results_counts.entry(id.1).or_insert(0) += 1;
+        *results_total_length.entry(id.1).or_insert(0) += id.6;
         *final_counts_taxon.entry(id.1).or_insert(0) += id.5.len();
         for c in id.4 {
             *final_counts.entry(c.0).or_insert(0) += c.1;
@@ -1007,10 +1016,11 @@ pub fn per_read_stream_se(
             } else {
                 file.write_all(
                     format!(
-                        "{}\t{}\t{:.3}\n",
+                        "{}\t{}\t{:.3}\t{}\n",
                         taxonomy[&key],
                         value,
                         results_ratios[&key] / value as f64,
+                        results_total_length[&key]
                     )
                     .as_bytes(),
                 )
@@ -1065,6 +1075,7 @@ pub fn per_read_stream_pe(
     let mut results = Vec::new();
     let mut results_counts: HashMap<u32, usize> = HashMap::new();
     let mut results_ratios: HashMap<u32, f64> = HashMap::new();
+    let mut results_total_length: HashMap<u32, usize> = HashMap::new();
     let mut final_counts: HashMap<u32, usize> = HashMap::new(); //actually counts of minimizers
     let mut hll_map: HashMap<u32, HyperLogLog<u64>> = HashMap::new();
     let mut hll_map_taxon: HashMap<u32, HyperLogLog<u64>> = HashMap::new();
@@ -1076,12 +1087,14 @@ pub fn per_read_stream_pe(
         read_count += 1;
         if let Some(record2) = reader2.next() {
             let seqrec2 = record2.expect("invalid record in reverse file");
+            let sec_length = seqrec1.seq().len() + seqrec2.seq().len();
             if qual_offset == 0 {
                 vec.push((
                     str::from_utf8(seqrec1.id()).unwrap().to_string(),
                     str::from_utf8(&seqrec1.seq()).unwrap().to_string()
                         + &"N"
                         + str::from_utf8(&seqrec2.seq()).unwrap(),
+                    sec_length,
                 ));
             } else {
                 vec.push((
@@ -1100,6 +1113,7 @@ pub fn per_read_stream_pe(
                                 .to_string(),
                             qual_offset,
                         ),
+                        sec_length,
                 ))
             }
         }
@@ -1162,6 +1176,7 @@ pub fn per_read_stream_pe(
     eprint!("{} read pairs classified\r", read_count);
     for id in c {
         *results_counts.entry(id.1).or_insert(0) += 1;
+        *results_total_length.entry(id.1).or_insert(0) += id.6;
         *final_counts_taxon.entry(id.1).or_insert(0) += id.5.len();
         for c in id.4 {
             *final_counts.entry(c.0).or_insert(0) += c.1;
@@ -1254,10 +1269,11 @@ pub fn per_read_stream_pe(
             } else {
                 file.write_all(
                     format!(
-                        "{}\t{}\t{:.3}\n",
+                        "{}\t{}\t{:.3}\t{}\n",
                         taxonomy[&key],
                         value,
                         results_ratios[&key] / value as f64,
+                        results_total_length[&key],
                     )
                     .as_bytes(),
                 )
