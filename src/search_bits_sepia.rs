@@ -1131,6 +1131,7 @@ pub fn per_read_stream_pe(
             for id in c {
                 *results_counts.entry(id.1).or_insert(0) += 1;
                 *final_counts_taxon.entry(id.1).or_insert(0) += id.5.len();
+                *results_total_length.entry(id.1).or_insert(0) += id.6;
                 for c in id.4 {
                     *final_counts.entry(c.0).or_insert(0) += c.1;
                 }
