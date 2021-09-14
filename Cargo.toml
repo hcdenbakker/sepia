@@ -30,6 +30,8 @@ thincollections = "0.5.3"
 niffler = "2.1.1"
 needletail = "0.4"
 hyperloglog = "0.0.12"
+sysinfo = "0.20.3"
+fs_extra = "1.2.0"
 
 [features]
 default = ["boomphf/serde", "hashbrown/serde"]
