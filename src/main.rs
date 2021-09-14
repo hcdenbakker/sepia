@@ -597,6 +597,15 @@ fn main() {
             false
         };
         eprintln!("Loading index and parameters...");
+        //check size index and total/available RAM
+        let index_size = get_size(index).unwrap(); //size in bytes
+        // we have initialize without_processes to avoid interference with the thread pool builder
+        let mut sys_info = sysinfo_System::new_with_specifics(RefreshKind::everything().without_processes());
+        let ram = sys_info.total_memory();
+        if index_size as f64/1024.0 > ram as f64{
+            eprintln!("Memory size {} KB is not enough to load an index of {:.3} KB; Abort!", ram, index_size);
+            process::abort();
+         }
         let parameters =
             sepia::build_index::read_parameters_phf(&(index.to_owned() + "/parameters"));
         if parameters.mode == "boom" {
