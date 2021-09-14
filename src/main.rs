@@ -13,6 +13,8 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::process;
 use std::time::SystemTime;
+use fs_extra::dir::get_size;
+use sysinfo::{SystemExt, RefreshKind, System as sysinfo_System};
 
 #[macro_use]
 extern crate clap;
@@ -358,6 +360,15 @@ fn main() {
         };
         let hll = matches.is_present("hll");
         eprintln!("Value of hll is {}", hll);
+        //check size index and total/available RAM
+        let index_size = get_size(index).unwrap(); //size in bytes
+        // we have initialize without_processes to avoid interference with the thread pool builder 
+        let mut sys_info = sysinfo_System::new_with_specifics(RefreshKind::everything().without_processes());
+        let ram = sys_info.total_memory();
+        if index_size as f64/1024.0 > ram as f64{
+            eprintln!("Memory size {} KB is not enough to load an index of {:.3} KB; Abort!", ram, index_size);
+            process::abort();
+         } 
         //detect format; we determine if we have fasta or fastq, or throw an errer if we cannot
         //recognize the format, or if we have a mix of fasta and fastq
         let mut formats: HashSet<String> = HashSet::new();
