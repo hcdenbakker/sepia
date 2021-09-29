@@ -15,6 +15,7 @@ use std::process;
 use std::time::SystemTime;
 use fs_extra::dir::get_size;
 use sysinfo::{SystemExt, RefreshKind, System as sysinfo_System};
+use std::io::{BufWriter, Write};
 
 #[macro_use]
 extern crate clap;
@@ -276,9 +277,42 @@ fn main() {
         }
         //let (lineages, species) =
         //    taxon_boom::taxonomy_u32::taxonomy_map(matches.value_of("taxonomy").unwrap());
-        let (lineages, lookup, graph) =
+        let (lineages, lookup, graph, taxon_lineage) =
             sepia::taxonomy_u32::taxonomy_map_level_agnostic(&taxonomy);
-        //let (lineages, lookup, graph) = sepia_hllu64::taxonomy_u32::taxonomy_map_plus(&taxonomy);
+        //check if some taxa have different ancestral lineages, write to file those who have
+        //and leave to user to fix or accept
+        fs::DirBuilder::new()
+                .recursive(true)
+                .create("./".to_string() + index)
+                .expect("could not initiate db directory");
+        let f = File::create(index.to_owned() + "/taxonomy_ambiguities.txt").expect("Unable to create file");
+        let mut f = BufWriter::new(f);
+        let mut taxon_lineage_set: HashMap<String, HashSet<String>> = HashMap::default();
+        for l in taxon_lineage{
+            if taxon_lineage_set.contains_key(&l.0){
+                let mut old_set = taxon_lineage_set[&l.0].to_owned();
+                old_set.insert(l.1);
+                taxon_lineage_set.insert(l.0, old_set);
+            }else{
+            let mut new_set: HashSet<String> = HashSet::default();
+            new_set.insert(l.1);
+            taxon_lineage_set.insert(l.0, new_set);
+            }
+        }
+        //now check if there are taxa with multiple different ancestral lineages
+        let mut ambiguous_taxa:u64 = 0;
+        for (k, v) in taxon_lineage_set{
+            if v.len() > 1{
+                ambiguous_taxa += 1;
+                write!(f, "{}:\n", k).expect("could not write to taxonomy_ambiguities.txt file!");
+                for l in v{
+                    write!(f,"{}/{}\n", l, k).expect("could not write to taxonomy_ambiguities.txt file!");
+                }
+            }
+        }
+        if ambiguous_taxa > 0{
+            eprintln!("Putative ambiguities in taxonomy, check the 'taxonomy_ambiguities.txt' file in the index folder if it needs fixing!")
+        }
         eprintln!(
             "length taxonomy: {}, root value: {}",
             lineages.len(),
@@ -300,11 +334,6 @@ fn main() {
                 &map, &lineages, &lookup, &graph, kmer, mmer, gamma, batch,
             );
             println!("Saving index to file.");
-
-            fs::DirBuilder::new()
-                .recursive(true)
-                .create("./".to_string() + index)
-                .expect("could not initiate db");
             direct_read_write::do_write_u32(&("./".to_string() + index + "/db_phf.dump"), &db);
 
             let serialized: Vec<u8> = serialize(&phf).unwrap();
