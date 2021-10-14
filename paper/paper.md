@@ -4,7 +4,7 @@ authors:
 - affiliation: 1
   name: Henk C. den Bakker^[corresponding author]
   orcid: 0000-0002-4086-1580
-- affiliation: 1,2
+- affiliation: "1, 2"
   name: Lee S. Katz
   orcid: 0000-0002-2533-9161
 date: “20 September, 2021”
