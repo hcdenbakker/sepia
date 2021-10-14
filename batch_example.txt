@@ -1,0 +1,3 @@
+Ecoli1	1000K_test_fq/Ecoli1_1000K_1.fastq.gz	1000K_test_fq/Ecoli1_1000K_2.fastq.gz
+Ecoli2	1000K_test_fq/Ecoli2_1000K_1.fastq.gz	1000K_test_fq/Ecoli2_1000K_2.fastq.gz
+Efaecium	1000K_test_fq/Efaecium_1000K_1.fastq.gz	1000K_test_fq/Efaecium_1000K_2.fastq.gz
