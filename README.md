@@ -1,3 +1,5 @@
+[![Build Status](https://app.travis-ci.com/hcdenbakker/sepia.svg?branch=main)](https://app.travis-ci.com/hcdenbakker/sepia)
+
 # Sepia
 Sepia is a (taxonomic) read classifier written in Rust based on (extensions) of the kraken2 algorithms (https://github.com/DerrickWood/kraken2), hence the name Sepia (just like the kraken a cephalopod, and the rust colored
 pigment derived from it's ink sac). The reason I wrote Sepia is to create a software package that can be easily adapted to novel taxonomies or updates of taxonomies (e.g. GTDB), alter-
