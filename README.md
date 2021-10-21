@@ -133,12 +133,12 @@ This will create two files; a file summarizing the analysis ('your_output_name_s
 we can see the first 3 lines of the summary file sorted by number of reads:
 
 ```
-root;cellular organisms;Bacteria;Proteobacteria;delta/epsilon subdivisions;Epsilonproteobacteria;Campylobacterales;Campylobacteraceae;Campylobacter;Campylobacter jejuni;Campylobacter jejuni subsp. jejuni	121338	0.719
-root;cellular organisms;Bacteria;Proteobacteria;delta/epsilon subdivisions;Epsilonproteobacteria;Campylobacterales;Campylobacteraceae;Campylobacter	14249	0.820
-root;cellular organisms;Bacteria;Proteobacteria;delta/epsilon subdivisions;Epsilonproteobacteria;Campylobacterales;Campylobacteraceae;Campylobacter;Campylobacter coli	13594	0.584
+root;cellular organisms;Bacteria;Proteobacteria;delta/epsilon subdivisions;Epsilonproteobacteria;Campylobacterales;Campylobacteraceae;Campylobacter;Campylobacter jejuni;Campylobacter jejuni subsp. jejuni	121338	0.719	36401400
+root;cellular organisms;Bacteria;Proteobacteria;delta/epsilon subdivisions;Epsilonproteobacteria;Campylobacterales;Campylobacteraceae;Campylobacter	14249	0.820	4274700
+root;cellular organisms;Bacteria;Proteobacteria;delta/epsilon subdivisions;Epsilonproteobacteria;Campylobacterales;Campylobacteraceae;Campylobacter;Campylobacter coli	13594	0.584	4078200
 ```
-The first column shows the complete taxonomy lineage, the second the number of reads, and the third the average k-mer similarity or if minimizers are used the approximate average k-mer similarity for all reads classified as the taxon in column
-one. 
+The first column shows the complete taxonomy lineage, the second the number of reads, the third the average k-mer similarity or if minimizers are used the approximate average k-mer similarity for all reads classified as the taxon in column
+one, and the fourth column shows the sum of the length of all sequences classified as the taxon in column one. The last column is particularly helpful for sequence tachnologies that produces reads of variable length (e.g., Oxford Nanopore).
 
 If we look at the first 3 lines of the  classification file:
 
