@@ -36,6 +36,7 @@ fn main() {
                     .setting(AppSettings::ArgRequiredElseHelp)
                     .arg(
                         Arg::with_name("index")
+                            .help("Output directory for the index")
                             .short("i")
                             .long("index")
                             .required(true)
