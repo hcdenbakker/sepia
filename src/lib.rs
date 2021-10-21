@@ -2,16 +2,12 @@
 extern crate lazy_static;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate itertools;
 
 pub mod kmer;
 
 pub mod seq;
 
 pub mod zeroth;
-
-pub mod search_bits_bsyncm;
 
 pub mod bit_magic;
 

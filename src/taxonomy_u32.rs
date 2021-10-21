@@ -1,5 +1,4 @@
 use hashbrown::HashMap;
-use hashbrown::HashSet;
 use sdset::duo::OpBuilder;
 use sdset::{Set, SetBuf, SetOperation};
 use std::fs::File;
@@ -20,10 +19,10 @@ pub fn species_to_lineage(path: &str) -> HashMap<String, String> {
 pub fn taxonomy_map_level_agnostic(
     taxonomy_vector: &[String],
 ) -> (
-    HashMap<u32, String>, // key: u32 value: taxonomy_string
-    HashMap<String, u32>, // key: taxonomy_string, value: u32
-    HashMap<u32, u32>,    //unidirectional graph connecting lower to higher order taxa
-    Vec<(String,String)>, //vector with potentially problematic lineages 
+    HashMap<u32, String>,  // key: u32 value: taxonomy_string
+    HashMap<String, u32>,  // key: taxonomy_string, value: u32
+    HashMap<u32, u32>,     //unidirectional graph connecting lower to higher order taxa
+    Vec<(String, String)>, //vector with potentially problematic lineages
 ) {
     let mut map = HashMap::default();
     let mut map_inv: HashMap<String, u32> = HashMap::default();
@@ -35,12 +34,13 @@ pub fn taxonomy_map_level_agnostic(
     let mut taxon_counter: u32 = 1;
     let mut lineage_u32 = Vec::new();
     let mut lineage_string = Vec::new();
-    let mut taxon_lineage: Vec<(String,String)> = Vec::new();
+    let mut taxon_lineage: Vec<(String, String)> = Vec::new();
     for lineage in taxonomy_vector {
         let v: Vec<&str> = lineage.split(';').collect();
         lineage_u32.push(1 as u32);
         lineage_string.push("root".to_string());
-        for taxon in v {   //this is going to be problematic is a taxon name is found in multiple lineages! Take the whole lineage as node name
+        for taxon in v {
+            //this is going to be problematic is a taxon name is found in multiple lineages! Take the whole lineage as node name
             taxon_lineage.push((taxon.to_string(), lineage_string.join(";").to_string()));
             lineage_string.push(taxon.to_string());
             if taxa_to_u32.contains_key(&lineage_string.join(";")) {
@@ -66,7 +66,6 @@ pub fn taxonomy_map_level_agnostic(
     map_inv.insert("unclassified".to_string(), unclassified);
     (map, map_inv, taxonomy_graph, taxon_lineage)
 }
-
 
 pub fn get_lineage_graph(query: u32, graph: &HashMap<u32, u32>) -> Vec<u32> {
     let mut stop = false;

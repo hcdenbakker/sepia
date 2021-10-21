@@ -1,3 +1,6 @@
+//This is an attempt at implementing Robert Edgar's syncmers (PMID 33604186) as an alternative to minimizers.
+//This implementation is not included in the main code yet but maybe in future versions
+
 use super::bit_magic::get_sepia;
 use super::kmer;
 use needletail::parse_fastx_file;
@@ -7,7 +10,6 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 
 use hashbrown::HashMap;
-use itertools::Itertools;
 use rayon::prelude::*;
 use std;
 
@@ -17,7 +19,7 @@ use std::fs::File;
 
 use std::io;
 use std::io::Write;
-use std::io::{BufReader, BufWriter};
+use std::io::BufWriter;
 use std::str;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -202,10 +204,10 @@ fn sliding_window_bsyncmers_skip_n_u64(seq: &str, k: usize, m: usize) -> Vec<u64
     let mut candidate = u64::MAX;
     let mut kmer_u64 = u64::MAX;
     let mut mask: u64 = 1;
-    mask <<= (m * 2);
+    mask <<= m * 2;
     mask -= 1;
     let mut k_mask: u64 = 1;
-    k_mask <<= (k * 2);
+    k_mask <<= k * 2;
     k_mask -= 1;
     let toggle = TOGGLE & mask;
     for n in seq.bytes() {
@@ -223,8 +225,8 @@ fn sliding_window_bsyncmers_skip_n_u64(seq: &str, k: usize, m: usize) -> Vec<u64
                     window.pop_back(); // we pop the last one
                 }
                 window.push_back((minimizer, i - m + 1, candidate)); // and make add a pair with the new value at the end
-                while ((window.front().unwrap().1 as isize)
-                    < (i as isize - window_size as isize + 1))
+                while (window.front().unwrap().1 as isize)
+                    < (i as isize - window_size as isize + 1)
                 {
                     window.pop_front(); // pop the first one
                 }

@@ -11,7 +11,7 @@ Download one of the precompiled binaries (currently only for macOS and Linux), o
 2. Clone the sepia repository:
 	`git clone https://github.com/hcdenbakker/sepia.git`
 3. Compile sepia with `cargo` (Rust's compiler):
-`cd sepia; cargo build --release` (Don't worry about the warnings you'll see)
+`cd sepia; cargo build --release`
 
  ## Running Sepia
  

@@ -7,7 +7,6 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 
 use hashbrown::HashMap;
-use itertools::Itertools;
 use rayon::prelude::*;
 use std;
 
@@ -17,7 +16,7 @@ use std::fs::File;
 
 use std::io;
 use std::io::Write;
-use std::io::{BufReader, BufWriter};
+use std::io::BufWriter;
 use std::str;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -579,7 +578,7 @@ pub fn parallel_vec_sepia_pre_hll(
                     observations,
                     report,
                     kmer_info,
-                    r.2.to_owned(),//length
+                    r.2.to_owned(), //length
                 )
             } else {
                 let classification =
@@ -591,7 +590,7 @@ pub fn parallel_vec_sepia_pre_hll(
                     classification.2.to_owned(),
                     report,
                     kmer_info,
-                    r.2.to_owned(),//length
+                    r.2.to_owned(), //length
                 )
             }
             // }
@@ -732,9 +731,9 @@ pub fn per_read_stream_not_parallel(
     kmer_size: usize,
     m_size: usize, //if m and k are set to the same value this effectively makes it kmer based
     value_bits: u32,
-    batch_size: usize, //batch size for multi-threading
+    _batch_size: usize, //batch size for multi-threading
     prefix: &str,
-    qual_offset: u8, //if set to 0 can also be used for fasta
+    _qual_offset: u8, //if set to 0 can also be used for fasta
     compressed_output: bool,
 ) /* -> std::collections::HashMap<std::string::String, usize>*/
 {
@@ -1113,7 +1112,7 @@ pub fn per_read_stream_pe(
                                 .to_string(),
                             qual_offset,
                         ),
-                        sec_length,
+                    sec_length,
                 ))
             }
         }
@@ -1185,12 +1184,12 @@ pub fn per_read_stream_pe(
         if hll {
             for f in &id.5 {
                 if hll_map_taxon.contains_key(&id.1) {
-                            hll_map_taxon.get_mut(&id.1).unwrap().insert(&f.1);
-                        } else {
-                            let mut hllp = HyperLogLog::new(0.001);
-                            hllp.insert(&f.1);
-                            hll_map_taxon.insert(id.1, hllp);
-                        }
+                    hll_map_taxon.get_mut(&id.1).unwrap().insert(&f.1);
+                } else {
+                    let mut hllp = HyperLogLog::new(0.001);
+                    hllp.insert(&f.1);
+                    hll_map_taxon.insert(id.1, hllp);
+                }
                 if hll_map.contains_key(&f.0) {
                     hll_map.get_mut(&f.0).unwrap().insert(&f.1);
                 } else {
@@ -1233,7 +1232,7 @@ pub fn per_read_stream_pe(
     }
     let mut file =
         File::create(format!("{}_summary.txt", prefix)).expect("could not create outfile!");
-        for (key, value) in results_counts {
+    for (key, value) in results_counts {
         if final_counts.contains_key(&key) {
             if hll {
                 if hll_map_taxon.contains_key(&key) {
@@ -1305,7 +1304,7 @@ pub fn per_read_stream_pe(
                 .expect("could not write results!");
             }
         }
-    }        
+    }
 }
 
 #[allow(unused_assignments)]
