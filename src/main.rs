@@ -1,6 +1,7 @@
 use bincode::{deserialize_from, serialize};
 use boomphf::*;
 use clap::{App, AppSettings, Arg, SubCommand};
+use fs_extra::dir::get_size;
 use hashbrown::HashMap;
 use rayon::ThreadPoolBuilder;
 use sepia::direct_read_write;
@@ -9,13 +10,11 @@ use std::alloc::System;
 use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
-use std::io::prelude::*;
 use std::io::BufReader;
+use std::io::{BufWriter, Write};
 use std::process;
 use std::time::SystemTime;
-use fs_extra::dir::get_size;
-use sysinfo::{SystemExt, RefreshKind, System as sysinfo_System};
-use std::io::{BufWriter, Write};
+use sysinfo::{RefreshKind, System as sysinfo_System, SystemExt};
 
 #[macro_use]
 extern crate clap;
@@ -268,8 +267,7 @@ fn main() {
         //hack to work around current clap bug with default values only being &str
         let index = matches.value_of("index").unwrap();
         //is going to be fasta-file \t lineage
-        let map =
-            sepia::build_index::tab_to_vec(matches.value_of("ref_file").unwrap().to_string());
+        let map = sepia::build_index::tab_to_vec(matches.value_of("ref_file").unwrap().to_string());
         //get a vec with taxonomy
         let mut taxonomy = Vec::new();
         for accession in &map {
@@ -282,35 +280,37 @@ fn main() {
         //check if some taxa have different ancestral lineages, write to file those who have
         //and leave to user to fix or accept
         fs::DirBuilder::new()
-                .recursive(true)
-                .create("./".to_string() + index)
-                .expect("could not initiate db directory");
-        let f = File::create(index.to_owned() + "/taxonomy_ambiguities.txt").expect("Unable to create file");
+            .recursive(true)
+            .create("./".to_string() + index)
+            .expect("could not initiate db directory");
+        let f = File::create(index.to_owned() + "/taxonomy_ambiguities.txt")
+            .expect("Unable to create file");
         let mut f = BufWriter::new(f);
         let mut taxon_lineage_set: HashMap<String, HashSet<String>> = HashMap::default();
-        for l in taxon_lineage{
-            if taxon_lineage_set.contains_key(&l.0){
+        for l in taxon_lineage {
+            if taxon_lineage_set.contains_key(&l.0) {
                 let mut old_set = taxon_lineage_set[&l.0].to_owned();
                 old_set.insert(l.1);
                 taxon_lineage_set.insert(l.0, old_set);
-            }else{
-            let mut new_set: HashSet<String> = HashSet::default();
-            new_set.insert(l.1);
-            taxon_lineage_set.insert(l.0, new_set);
+            } else {
+                let mut new_set: HashSet<String> = HashSet::default();
+                new_set.insert(l.1);
+                taxon_lineage_set.insert(l.0, new_set);
             }
         }
         //now check if there are taxa with multiple different ancestral lineages
-        let mut ambiguous_taxa:u64 = 0;
-        for (k, v) in taxon_lineage_set{
-            if v.len() > 1{
+        let mut ambiguous_taxa: u64 = 0;
+        for (k, v) in taxon_lineage_set {
+            if v.len() > 1 {
                 ambiguous_taxa += 1;
                 write!(f, "{}:\n", k).expect("could not write to taxonomy_ambiguities.txt file!");
-                for l in v{
-                    write!(f,"{}/{}\n", l, k).expect("could not write to taxonomy_ambiguities.txt file!");
+                for l in v {
+                    write!(f, "{}/{}\n", l, k)
+                        .expect("could not write to taxonomy_ambiguities.txt file!");
                 }
             }
         }
-        if ambiguous_taxa > 0{
+        if ambiguous_taxa > 0 {
             eprintln!("Putative ambiguities in taxonomy, check the 'taxonomy_ambiguities.txt' file in the index folder if it needs fixing!")
         }
         eprintln!(
@@ -391,13 +391,17 @@ fn main() {
         eprintln!("Value of hll is {}", hll);
         //check size index and total/available RAM
         let index_size = get_size(index).unwrap(); //size in bytes
-        // we have initialize without_processes to avoid interference with the thread pool builder 
-        let mut sys_info = sysinfo_System::new_with_specifics(RefreshKind::everything().without_processes());
+                                                   // we have initialize without_processes to avoid interference with the thread pool builder
+        let sys_info =
+            sysinfo_System::new_with_specifics(RefreshKind::everything().without_processes());
         let ram = sys_info.total_memory();
-        if index_size as f64/1024.0 > ram as f64{
-            eprintln!("Memory size {} KB is not enough to load an index of {:.3} KB; Abort!", ram, index_size);
+        if index_size as f64 / 1024.0 > ram as f64 {
+            eprintln!(
+                "Memory size {} KB is not enough to load an index of {:.3} KB; Abort!",
+                ram, index_size
+            );
             process::abort();
-         } 
+        }
         //detect format; we determine if we have fasta or fastq, or throw an errer if we cannot
         //recognize the format, or if we have a mix of fasta and fastq
         let mut formats: HashSet<String> = HashSet::new();
@@ -628,13 +632,17 @@ fn main() {
         eprintln!("Loading index and parameters...");
         //check size index and total/available RAM
         let index_size = get_size(index).unwrap(); //size in bytes
-        // we have initialize without_processes to avoid interference with the thread pool builder
-        let mut sys_info = sysinfo_System::new_with_specifics(RefreshKind::everything().without_processes());
+                                                   // we have initialize without_processes to avoid interference with the thread pool builder
+        let sys_info =
+            sysinfo_System::new_with_specifics(RefreshKind::everything().without_processes());
         let ram = sys_info.total_memory();
-        if index_size as f64/1024.0 > ram as f64{
-            eprintln!("Memory size {} KB is not enough to load an index of {:.3} KB; Abort!", ram, index_size);
+        if index_size as f64 / 1024.0 > ram as f64 {
+            eprintln!(
+                "Memory size {} KB is not enough to load an index of {:.3} KB; Abort!",
+                ram, index_size
+            );
             process::abort();
-         }
+        }
         let parameters =
             sepia::build_index::read_parameters_phf(&(index.to_owned() + "/parameters"));
         if parameters.mode == "boom" {

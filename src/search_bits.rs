@@ -3,13 +3,10 @@ use super::kmer;
 use boomphf::*;
 use needletail::parse_fastx_file;
 
-use flate2::read::MultiGzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use niffler;
 
 use hashbrown::HashMap;
-use itertools::Itertools;
 use rayon::prelude::*;
 use std;
 
@@ -17,59 +14,15 @@ use std::collections::VecDeque;
 
 use std::fs::File;
 
-use std::io;
 use std::io::Write;
-use std::io::{BufReader, BufWriter};
+use std::io::BufWriter;
 use std::str;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use bstr::io::BufReadExt;
 use bstr::ByteVec;
 use sdset::Set;
 
-/*#[inline]
-fn sliding_window_minimizers_phf(
-    seq: &str,
-    k: usize,
-    m: usize,
-    b: u32,
-    db: &[u32],
-    phf: &Mphf<u64>,
-) -> (hashbrown::HashMap<u32, usize>, usize) {
-    let mut window: VecDeque<(&str, usize)> = VecDeque::new();
-    let mut report = HashMap::default();
-    let mut observations = 0;
-    let r_seq = kmer::revcomp(&seq);
-    let length = seq.len();
-    let mut taxon = 0;
-    let mut current_minimizer: String = "".to_string();
-    for i in 0..=seq.len() - m {
-        let minimizer = min(&seq[i..i + m], &r_seq[length - (i + m)..length - i]);
-        while !window.is_empty() && window.back().unwrap().0 > minimizer {
-            window.pop_back();
-        }
-        window.push_back((minimizer, i));
-        while window.front().unwrap().1 as isize <= i as isize - k as isize + m as isize - 1 {
-            window.pop_front(); // pop the first one
-        }
-        if i >= k - m {
-            if seq::has_no_n(&seq[i - (k - m)..i + m].as_bytes()) {
-                if current_minimizer == window.front().unwrap().0 {
-                    let count = report.entry(taxon).or_insert(0);
-                    *count += 1;
-                } else {
-                    taxon = get_phf(&window.front().unwrap().0, &db, phf, b);
-                    let count = report.entry(taxon).or_insert(0);
-                    *count += 1;
-                    current_minimizer = window.front().unwrap().0.to_string();
-                }
-                observations += 1;
-            }
-        }
-    }
-    (report, observations)
-}*/
 
 const TOGGLE: u64 = 0xe37e28c4271b5a2d;
 
@@ -87,7 +40,6 @@ fn sliding_window_minimizers_phf_vec(
     let mut window: VecDeque<(u64, usize)> = VecDeque::new(); //position minimizer
     let mut taxon = 0;
     let mut current_minimizer: u64 = 0;
-    let length = seq.len();
     let mut counter = 0;
     let mut i = 1;
     let mut candidate: u64 = 0;

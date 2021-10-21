@@ -241,7 +241,6 @@ pub fn sliding_window_minimizers_skip_n_u64(seq: &str, k: usize, m: usize) -> Ve
     let mut vec: Vec<u64> = Vec::new();
     //let mut window: VecDeque<(ArrayString<[_; m]>, usize)> = VecDeque::new(); //position minimizer
     let mut window: VecDeque<(u64, usize)> = VecDeque::new(); //position minimizer
-    let length = seq.len();
     let mut counter = 0;
     let mut i = 1;
     //let mut j = 1; //total seq counter

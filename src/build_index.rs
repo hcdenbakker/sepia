@@ -15,10 +15,10 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::process;
 use std::sync::Mutex;
 use std::time::Instant;
-use std::process;
-use sysinfo::{SystemExt,System};
+use sysinfo::{System, SystemExt};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Parameters {
@@ -63,7 +63,6 @@ pub fn accession_to_tax(filename: String) -> fnv::FnvHashMap<std::string::String
     }
     map
 }
-
 
 pub fn tab_to_vec(filename: String) -> Vec<Vec<String>> {
     let mut accession_vector = Vec::new();
@@ -590,15 +589,21 @@ pub fn build_db_bits_parallel_sepia(
     eprintln!("Estimating total number of unique kmers/minimizers...");
     let accessions_estimate = zeroth(&accessions, kmer_size, m_size, batch);
     let vector_size = (accessions_estimate as f64 / 0.7) as usize;
-    println!("Estimated index size: {:.3} Gb", (vector_size as f64/4.0)/1073741824.0);
+    println!(
+        "Estimated index size: {:.3} Gb",
+        (vector_size as f64 / 4.0) / 1073741824.0
+    );
     let mut sys = System::new_all();
     sys.refresh_all();
-    let estimated_size_index = (vector_size as f64/4.0)/1048576.0; // in KB
-    let RAM = sys.total_memory();
-    if estimated_size_index > RAM as f64{
-            eprintln!("RAM {} KB is not enough to build an index of {} KB; Abort!", RAM, estimated_size_index);
-            process::abort();
-        }
+    let estimated_size_index = (vector_size as f64 / 4.0) / 1048576.0; // in KB
+    let ram = sys.total_memory();
+    if estimated_size_index > ram as f64 {
+        eprintln!(
+            "RAM {} KB is not enough to build an index of {} KB; Abort!",
+            ram, estimated_size_index
+        );
+        process::abort();
+    }
     println!("Estimated number of minimizers: {}\nInitial size of compact hash set set to {}\nBuidling index...", accessions_estimate, vector_size);
     //let (phf, mut db) = hash_fingerprints(accessions, k_size, m_size, batch, value_bits);
     let mut db: Vec<u32> = vec![0; vector_size as usize];
@@ -608,7 +613,10 @@ pub fn build_db_bits_parallel_sepia(
     let mut vec = Vec::with_capacity(batch);
     for accession in accessions {
         let accession_plus_root = "root;".to_owned() + &accession[1];
-        let accession_lineage  = lookup.get(&accession_plus_root).expect(&format!("Could not find {} in lookup hash", &accession_plus_root));
+        let accession_lineage = lookup.get(&accession_plus_root).expect(&format!(
+            "Could not find {} in lookup hash",
+            &accession_plus_root
+        ));
         vec.push((accession_lineage, accession[0].to_owned()));
         if vec.len() % batch == 0 {
             let mut out_vec: Vec<_> = vec![];
@@ -716,4 +724,3 @@ pub fn build_db_bits_parallel_sepia(
     eprintln!("processed {}/{} accessions", processed, map_length);
     db
 }
-
