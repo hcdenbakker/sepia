@@ -13,8 +13,12 @@ function build() {
 }
 
 function print_separator() {
-  GREEN_LINE="\033[0;32m -------------------------------------------------------------- \033[0m"
-  echo -e "${GREEN_LINE}"
+  GREEN_LINE="-------------------------------------------------------------- "
+  echo -e "\033[0;32m ${GREEN_LINE} \033[0m"
+  if [ -n "$1" ]; then
+    echo -e "\033[0;32m ${1} \033[0m"
+  fi
+  
 }
 
 # DEFAULTS
@@ -42,15 +46,19 @@ while getopts "bcht:" opt; do
       ;;
     # -t INT (Threads)
     t)
-      echo " - Setting THREADS=$OPTARG"
+      echo " Setting THREADS=$OPTARG"
       THREADS=$OPTARG
       ;;
     h)
-      echo "Help:"
-      echo "  -b:     Force rebuilding the binary"
-      echo "  -c:     Clean test.sh products (binaries and output files)"
-      echo "  -t INT: Number of threads for multithreading [default: 2]"
-      echo "  -h:     help"
+      print_separator " Test Sepia"
+      echo ""
+      echo " Help:"
+      echo "  -b      Force rebuilding the binary"
+      echo "  -c      Clean test.sh products (binaries and output files)"
+      echo "  -t INT  Number of threads for multithreading [default: 2]"
+      echo "  -h      help"
+      echo ""
+      exit
       ;;
     \?)
       echo "Invalid option: -$OPTARG"
@@ -72,8 +80,7 @@ if [[ ! -e "$DIR"/target/release/sepia ]]; then
 fi
 
 # Build the database with one thread
-print_separator;
-echo " [1] Building the index";
+print_separator " [1] Building the index";
 ./target/release/sepia build -k 31 -m 21 -i ./demo_index -r ./ref_demo.txt
 if [[ $? -gt 0 ]]; then
   echo "ERROR building sepia index ./demo_index using ./ref_demo.txt";
@@ -81,8 +88,7 @@ if [[ $? -gt 0 ]]; then
 fi
 
 # Build the database with two threads
-print_separator
-echo " [2] Building the index (multithreads)"
+print_separator " [2] Building the index (multithreads)"
 ./target/release/sepia build -k 31 -m 21 -i ./demo_index -r ./ref_demo.txt -p $THREADS -c 2
 if [[ $? -gt 0 ]]; then
   echo "ERROR building sepia index ./demo_index using ./ref_demo.txt";
@@ -90,8 +96,7 @@ if [[ $? -gt 0 ]]; then
 fi
 
 #single end read classification
-print_separator
-echo " [3] Classifying single end reads"
+print_separator " [3] Classifying single end reads"
 ./target/release/sepia classify -i ./demo_index -q ./1000K_test_fq/Ecoli1_1000K_1.fastq.gz -n test_classify -t $THREADS
 if [ $? -gt 0 ]; then
   echo "ERROR classifying reads ./test_data/SRR548019.fastq.gz with ./test_data/phage.bxi"
@@ -99,8 +104,7 @@ if [ $? -gt 0 ]; then
 fi
 
 #paired end read classification
-print_separator
-echo " [4] Classifying paired-end reads"
+print_separator " [4] Classifying paired-end reads"
 ./target/release/sepia classify -i ./demo_index -q ./1000K_test_fq/Ecoli1_1000K_*.fastq.gz -n test_classify -t $THREADS
 if [ $? -gt 0 ]; then
   echo "ERROR classifying reads ./test_data/SRR548019.fastq.gz with ./test_data/phage.bxi"
@@ -108,8 +112,7 @@ if [ $? -gt 0 ]; then
 fi
 
 #Test the output paired end read classification
-print_separator
-echo " [5] Testing the output";
+print_separator " [5] Testing the output";
 declare -a expected=('root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia coli_D	56	0.807	24029')
 lastIndex=$((${#expected[@]} - 1))
 #echo "$lastIndex .. ${expected[@]}"
@@ -126,8 +129,7 @@ done
 echo " [OK] All fields matched!"
 
 #paired end read batch classification (TODO)
-print_separator
-echo " [6] Classifying paired-end reads"
+print_separator " [6] Classifying paired-end reads"
 ./target/release/sepia batch_classify -i ./demo_index -q batch_example.txt -T batch_example -t $THREADS
 if [ $? -gt 0 ]; then
   echo "ERROR batch classifying reads batch_example.txt with demo_index"
@@ -135,8 +137,7 @@ if [ $? -gt 0 ]; then
 fi
 
 #Test the output paired end read classification
-print_separator
-echo " [7] Testing the output batch classification";
+print_separator " [7] Testing the output batch classification";
 declare -a expected1=('root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia coli_D	56	0.807	24029')
 declare -a expected2=('root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia coli_D	62	0.775	24338')
 declare -a expected3=('root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia albertii	1	0.038	501')
@@ -172,4 +173,5 @@ for i in $(seq 0 $lastIndex); do
     exit 1;
   fi
 done
-echo " [OK] All fields matched!"
+
+print_separator " [OK] All fields matched!"
