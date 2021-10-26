@@ -260,7 +260,7 @@ fn main() {
         let batch = value_t!(matches, "batch", usize).unwrap_or(300);
         println!("minimizers for {} samples inferred in parallel.", batch);
         let gamma = value_t!(matches, "gamma", f64).unwrap_or(5.0);
-        let mode = value_t!(matches, "mode", String).unwrap_or("sepia".to_string());
+        let mode = value_t!(matches, "mode", String).unwrap_or_else(|_| "sepia".to_string());
         if mmer > 31 {
             eprintln!("This version of sepia uses a 64 bit presentation of a minimizer, larger minimizers cannot be used!");
             process::abort();
@@ -330,7 +330,7 @@ fn main() {
 
         eprintln!("Creating index...");
 
-        if mode == "boom".to_string() {
+        if mode == *"boom" {
             let (db, phf) = sepia::build_index::build_db_bits_parallel_phf(
                 &map, &lineages, &lookup, &graph, kmer, mmer, gamma, batch,
             );
@@ -383,11 +383,7 @@ fn main() {
         let batch = value_t!(matches, "batch", usize).unwrap_or(50000);
         let interleaved = matches.is_present("interleaved");
         let compress_output = matches.value_of("compress_output").unwrap_or("true");
-        let gzip_output = if compress_output == "true" {
-            true
-        } else {
-            false
-        };
+        let gzip_output = compress_output == "true";
         let hll = matches.is_present("hll");
         eprintln!("Value of hll is {}", hll);
         //check size index and total/available RAM
@@ -430,7 +426,7 @@ fn main() {
 
         let parameters =
             sepia::build_index::read_parameters_phf(&(index.to_owned() + "/parameters"));
-        if parameters.mode == "boom".to_string() {
+        if parameters.mode == *"boom" {
             eprintln!("Index with perfect hash function detected!");
             let db = direct_read_write::do_read_u32(&(index.to_owned() + "/db_phf.dump"));
             let mut reader = BufReader::new(
@@ -625,11 +621,7 @@ fn main() {
         let batch = value_t!(matches, "batch", usize).unwrap_or(50000);
         let tag = matches.value_of("tag").unwrap();
         let compress_output = matches.value_of("compress_output").unwrap_or("true");
-        let gzip_output = if compress_output == "true" {
-            true
-        } else {
-            false
-        };
+        let gzip_output = compress_output == "true";
         eprintln!("Loading index and parameters...");
         //check size index and total/available RAM
         let index_size = get_size(index).unwrap(); //size in bytes

@@ -125,7 +125,7 @@ pub fn sliding_window_minimizers(
             window.pop_back();
         }
         window.push_back((minimizer, i));
-        while window.front().unwrap().1 as isize <= i as isize - k as isize + m as isize - 1 {
+        while (window.front().unwrap().1 as isize) < (i as isize - k as isize + m as isize) {
             window.pop_front();
         }
         if i >= k - m && seq::has_no_n(&seq[i - (k - m)..i + m].as_bytes()) {

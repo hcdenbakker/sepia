@@ -15,8 +15,8 @@ use std::collections::VecDeque;
 use std::fs::File;
 
 use std::io;
-use std::io::Write;
 use std::io::BufWriter;
+use std::io::Write;
 use std::str;
 use std::sync::Arc;
 use std::time::SystemTime;

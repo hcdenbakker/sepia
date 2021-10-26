@@ -14,15 +14,14 @@ use std::collections::VecDeque;
 
 use std::fs::File;
 
-use std::io::Write;
 use std::io::BufWriter;
+use std::io::Write;
 use std::str;
 use std::sync::Arc;
 use std::time::SystemTime;
 
 use bstr::ByteVec;
 use sdset::Set;
-
 
 const TOGGLE: u64 = 0xe37e28c4271b5a2d;
 
