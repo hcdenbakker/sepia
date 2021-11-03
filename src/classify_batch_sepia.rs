@@ -1,16 +1,12 @@
 use super::build_index;
 use super::search_bits_sepia;
-use hashbrown::HashMap;
+use super::build_index::Parameters;
 
 #[allow(unused_assignments)]
 pub fn batch_classify(
     batch_samples: &str,
     db: &[u32],
-    taxonomy: &HashMap<u32, String>,
-    lineage_graph: &HashMap<u32, u32>,
-    k: usize,
-    m: usize, //0 == no m, otherwise minimizer
-    value_bits: u32,
+    parameters: &Parameters,
     b: usize, //batch size for multi-threading
     qual_offset: u8,
     tag: &str,
@@ -28,12 +24,8 @@ pub fn batch_classify(
             if fq.len() > 1 {
                 search_bits_sepia::per_read_stream_pe(
                     &fq,
-                    &db,
-                    &taxonomy,
-                    &lineage_graph,
-                    k,
-                    m, //0 == no m, otherwise minimizer
-                    value_bits,
+                    db,
+                    parameters,
                     b,
                     &prefix,
                     qual_offset, // q cutoff
@@ -43,12 +35,8 @@ pub fn batch_classify(
             } else {
                 search_bits_sepia::per_read_stream_se(
                     &fq,
-                    &db,
-                    &taxonomy,
-                    &lineage_graph,
-                    k,
-                    m, //0 == no m, otherwise minimizer
-                    value_bits,
+                    db,
+                    parameters,
                     b,
                     &prefix,
                     qual_offset, // q cutoff
@@ -59,12 +47,8 @@ pub fn batch_classify(
         } else {
             search_bits_sepia::per_read_stream_se(
                 &fq,
-                &db,
-                &taxonomy,
-                &lineage_graph,
-                k,
-                m, //0 == no m, otherwise minimizer
-                value_bits,
+                db,
+                parameters,
                 b,
                 &prefix,
                 0, // 0 for no qual or fasta

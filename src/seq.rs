@@ -7,6 +7,12 @@ pub struct Fasta {
     pub seq: String, // sequence
 }
 
+impl Default for Fasta {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Fasta {
     pub fn new() -> Fasta {
         Fasta {
@@ -22,6 +28,12 @@ pub struct Fastq {
     pub qual1: String, // qual seq 1
     pub seq2: String,
     pub qual2: String,
+}
+
+impl Default for Fastq {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Fastq {
@@ -42,6 +54,12 @@ pub struct FastqU8 {
     pub qual1: Vec<u8>, // qual seq 1
     pub seq2: Vec<u8>,
     pub qual2: Vec<u8>,
+}
+
+impl Default for FastqU8 {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FastqU8 {
@@ -116,10 +134,7 @@ pub fn qual_mask(seq: &str, qual: &str, max_quality_offset: u8) -> String {
 //from needletail https://github.com/onecodex/needletail/blob/master/src/kmer.rs
 #[inline]
 pub fn is_good_base(chr: u8) -> bool {
-    match chr as char {
-        'a' | 'c' | 'g' | 't' | 'A' | 'C' | 'G' | 'T' => true,
-        _ => false,
-    }
+    matches!(chr as char, 'a' | 'c' | 'g' | 't' | 'A' | 'C' | 'G' | 'T')
 }
 #[inline]
 pub fn has_no_n(seq: &[u8]) -> bool {

@@ -304,9 +304,9 @@ fn main() {
         for (k, v) in taxon_lineage_set {
             if v.len() > 1 {
                 ambiguous_taxa += 1;
-                write!(f, "{}:\n", k).expect("could not write to taxonomy_ambiguities.txt file!");
+                writeln!(f, "{}:", k).expect("could not write to taxonomy_ambiguities.txt file!");
                 for l in v {
-                    write!(f, "{}/{}\n", l, k)
+                    writeln!(f, "{}/{}", l, k)
                         .expect("could not write to taxonomy_ambiguities.txt file!");
                 }
             }
@@ -358,7 +358,8 @@ fn main() {
             m_size: mmer,
             value_bits: bits_value,
             lineage_graph: graph,
-            mode: mode,
+            mode,
+            taxonomy: lineages,
         };
 
         let serialized: Vec<u8> = serialize(&parameters).unwrap();
@@ -367,11 +368,11 @@ fn main() {
             .write_all(&serialized)
             .expect("problems preparing serialized parameters for writing");
 
-        let serialized: Vec<u8> = serialize(&lineages).unwrap();
+        /*let serialized: Vec<u8> = serialize(&lineages).unwrap();
         let mut writer = File::create(&("./".to_string() + index + "/lineages")).unwrap();
         writer
             .write_all(&serialized)
-            .expect("problems preparing serialized data for writing");
+            .expect("problems preparing serialized data for writing");*/
     }
     if let Some(matches) = matches.subcommand_matches("classify") {
         let bigsi_time = SystemTime::now();
@@ -411,8 +412,8 @@ fn main() {
             eprintln!("sequence format not recognized or mixed fasta and fastq data");
             process::abort();
         }
-        if ((formats.get(&"fasta".to_string()) == Some(&"fasta".to_string())) && interleaved)
-            || (fq.len() > 1 && interleaved)
+        if (fq.len() > 1 || (formats.get(&"fasta".to_string()) == Some(&"fasta".to_string())))
+            && interleaved
         {
             eprintln!("Interleaved flag does not work with multiple files or fasta-format");
             process::abort();
@@ -455,12 +456,8 @@ fn main() {
                 sepia::search_bits::per_read_stream_pe(
                     &fq,
                     &db,
-                    &colors,
                     &phf,
-                    &parameters.lineage_graph,
-                    parameters.k_size,
-                    parameters.m_size,
-                    parameters.value_bits,
+                    &parameters,
                     batch,
                     prefix,
                     quality,
@@ -522,12 +519,6 @@ fn main() {
         } else {
             eprintln!("Index with default hash function assumed!");
             let db = direct_read_write::do_read_u32(&(index.to_owned() + "/db_sepia.dump"));
-            let mut reader = BufReader::new(
-                File::open(&(index.to_owned() + "/lineages")).expect("Can't open index!"),
-            );
-            let colors: HashMap<u32, String> =
-                deserialize_from(&mut reader).expect("can't deserialize");
-
             match bigsi_time.elapsed() {
                 Ok(elapsed) => {
                     eprintln!("Index loaded in {} seconds", elapsed.as_secs());
@@ -542,11 +533,7 @@ fn main() {
                 sepia::search_bits_sepia::per_read_stream_pe(
                     &fq,
                     &db,
-                    &colors,
-                    &parameters.lineage_graph,
-                    parameters.k_size,
-                    parameters.m_size,
-                    parameters.value_bits,
+                    &parameters,
                     batch,
                     prefix,
                     quality,
@@ -560,11 +547,7 @@ fn main() {
                     sepia::search_bits_sepia::per_read_stream_pe_one_file(
                         &fq,
                         &db,
-                        &colors,
-                        &parameters.lineage_graph,
-                        parameters.k_size,
-                        parameters.m_size, //0 == no m, otherwise minimizer
-                        parameters.value_bits,
+                        &parameters,
                         batch,
                         prefix,
                         quality, // q cutoff
@@ -575,11 +558,7 @@ fn main() {
                     sepia::search_bits_sepia::per_read_stream_se(
                         &fq,
                         &db,
-                        &colors,
-                        &parameters.lineage_graph,
-                        parameters.k_size,
-                        parameters.m_size, //0 == no m, otherwise minimizer
-                        parameters.value_bits,
+                        &parameters,
                         batch,
                         prefix,
                         quality, // q cutoff
@@ -593,11 +572,7 @@ fn main() {
                 sepia::search_bits_sepia::per_read_stream_se(
                     &fq,
                     &db,
-                    &colors,
-                    &parameters.lineage_graph,
-                    parameters.k_size,
-                    parameters.m_size, //0 == no m, otherwise minimizer
-                    parameters.value_bits,
+                    &parameters,
                     batch,
                     prefix,
                     0,
@@ -640,12 +615,6 @@ fn main() {
             sepia::build_index::read_parameters_phf(&(index.to_owned() + "/parameters"));
         if parameters.mode == "boom" {
             let db = direct_read_write::do_read_u32(&(index.to_owned() + "/db_phf.dump"));
-            let mut reader = BufReader::new(
-                File::open(&(index.to_owned() + "/lineages")).expect("Can't open index!"),
-            );
-            let colors: HashMap<u32, String> =
-                deserialize_from(&mut reader).expect("can't deserialize");
-
             let parameters =
                 sepia::build_index::read_parameters_phf(&(index.to_owned() + "/parameters"));
 
@@ -668,12 +637,8 @@ fn main() {
             sepia::classify_batch::batch_classify(
                 batch_samples,
                 &db,
-                &colors,
                 &phf,
-                &parameters.lineage_graph,
-                parameters.k_size,
-                parameters.m_size, //0 == no m, otherwise minimizer
-                parameters.value_bits,
+                &parameters,
                 batch, //batch size for multi-threading
                 quality,
                 tag,
@@ -681,12 +646,6 @@ fn main() {
             );
         } else {
             let db = direct_read_write::do_read_u32(&(index.to_owned() + "/db_sepia.dump"));
-            let mut reader = BufReader::new(
-                File::open(&(index.to_owned() + "/lineages")).expect("Can't open index!"),
-            );
-            let colors: HashMap<u32, String> =
-                deserialize_from(&mut reader).expect("can't deserialize");
-
             let parameters =
                 sepia::build_index::read_parameters_phf(&(index.to_owned() + "/parameters"));
 
@@ -703,11 +662,7 @@ fn main() {
             sepia::classify_batch_sepia::batch_classify(
                 batch_samples,
                 &db,
-                &colors,
-                &parameters.lineage_graph,
-                parameters.k_size,
-                parameters.m_size, //0 == no m, otherwise minimizer
-                parameters.value_bits,
+                &parameters,
                 batch, //batch size for multi-threading
                 quality,
                 tag,

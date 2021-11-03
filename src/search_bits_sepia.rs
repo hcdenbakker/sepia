@@ -1,7 +1,7 @@
 use super::bit_magic::get_sepia;
 use super::kmer;
+use super::build_index::Parameters;
 use needletail::parse_fastx_file;
-use niffler;
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -14,14 +14,12 @@ use std::collections::VecDeque;
 
 use std::fs::File;
 
-use std::io;
 use std::io::BufWriter;
 use std::io::Write;
 use std::str;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use bstr::io::BufReadExt;
 use bstr::ByteVec;
 use sdset::Set;
 
@@ -65,8 +63,7 @@ fn sliding_window_minimizers_sepia_vec(
                     window.pop_back(); // we pop the last one
                 }
                 window.push_back((minimizer, i)); // and make add a pair with the new value at the end
-                while window.front().unwrap().1 as isize <= i as isize - k as isize + m as isize - 1
-                {
+                while (window.front().unwrap().1 as isize) < i as isize - k as isize + m as isize {
                     window.pop_front(); // pop the first one
                 }
                 if i >= k {
@@ -77,7 +74,7 @@ fn sliding_window_minimizers_sepia_vec(
                     } else {
                         //continue
                         taxon =
-                            get_sepia(&(window.front().unwrap().0 ^ toggle), &db, capacity_db, b);
+                            get_sepia(&(window.front().unwrap().0 ^ toggle), db, capacity_db, b);
                         let count = report.entry(taxon).or_insert(0);
                         *count += 1;
                         current_minimizer = window.front().unwrap().0;
@@ -104,9 +101,9 @@ fn sliding_window_minimizers_sepia_vec(
 #[inline]
 fn sliding_window_minimizers_sepia_prehll(
     seq: &str,
-    k: usize,
-    m: usize,
-    b: u32,
+    kmer_size: usize,
+    mmer_size: usize,
+    bits: u32,
     db: &[u32],
 ) -> (Vec<(u32, usize)>, usize, Vec<(u32, u64)>) {
     let capacity_db = db.len();
@@ -120,12 +117,12 @@ fn sliding_window_minimizers_sepia_prehll(
     let mut current_minimizer: u64 = 0;
     let length = seq.len();
     let mut counter = 0;
-    let mut i = 1; //counter for minimizer, resets when ambiguous character is enountered
+    let mut mmer_counter = 1; //counter for minimizer, resets when ambiguous character is enountered
     let mut j = 1; //total seq counter
     let mut candidate: u64 = 0;
     let mut mask: u64 = 1;
     //let mut canonical_kmer = min(&seq[0..31], &l_r[length - (31)..length - 31]);
-    mask <<= m * 2;
+    mask <<= mmer_size * 2;
     mask -= 1;
     let toggle = TOGGLE & mask;
     for n in seq.bytes() {
@@ -143,25 +140,26 @@ fn sliding_window_minimizers_sepia_prehll(
             candidate <<= 2;
             candidate |= kmer::nuc_to_number(n);
             counter += 1;
-            if counter >= m {
+            if counter >= mmer_size {
                 candidate &= mask;
                 //candidate &= seed;
-                let mut minimizer = kmer::canonical(candidate, m);
+                let mut minimizer = kmer::canonical(candidate, mmer_size);
                 minimizer ^= toggle;
                 while !window.is_empty() && window.back().unwrap().0 > minimizer {
                     window.pop_back(); // we pop the last one
                 }
-                window.push_back((minimizer, i)); // and make add a pair with the new value at the end
-                while window.front().unwrap().1 as isize <= i as isize - k as isize + m as isize - 1
+                window.push_back((minimizer, mmer_counter)); // and make add a pair with the new value at the end
+                while (window.front().unwrap().1 as isize)
+                    < mmer_counter as isize - kmer_size as isize + mmer_size as isize
                 {
                     window.pop_front(); // pop the first one
                 }
-                if i >= k {
+                if mmer_counter >= kmer_size {
                     //println!("{}", canonical_kmer);
-                    let index = j - k;
+                    let index = j - kmer_size;
                     let canonical_kmer = min(
-                        &seq[index..index + k],
-                        &l_r[length - (index + k)..length - index],
+                        &seq[index..index + kmer_size],
+                        &l_r[length - (index + kmer_size)..length - index],
                     );
                     if current_minimizer == window.front().unwrap().0 {
                         let count = report.entry(taxon).or_insert(0);
@@ -169,7 +167,7 @@ fn sliding_window_minimizers_sepia_prehll(
                         report_kmers.push((taxon, seahash::hash(canonical_kmer.as_bytes())));
                     } else {
                         taxon =
-                            get_sepia(&(window.front().unwrap().0 ^ toggle), &db, capacity_db, b);
+                            get_sepia(&(window.front().unwrap().0 ^ toggle), db, capacity_db, bits);
                         let count = report.entry(taxon).or_insert(0);
                         *count += 1;
                         report_kmers.push((taxon, seahash::hash(canonical_kmer.as_bytes())));
@@ -181,7 +179,7 @@ fn sliding_window_minimizers_sepia_prehll(
         } else {
             // we have an ambiguous character: reset counter, empty queue
             counter = 0;
-            i = 0;
+            mmer_counter = 0;
             candidate = 0;
             window.clear();
         }
@@ -189,7 +187,7 @@ fn sliding_window_minimizers_sepia_prehll(
         //if i == length {
         //    break;
         //}
-        i += 1;
+        mmer_counter += 1;
         j += 1;
         /*if j == length {
             break;
@@ -203,7 +201,7 @@ fn sliding_window_minimizers_sepia_prehll(
 pub fn search_index_lca(map: &[String], db: &[u32], bloom_size: u64) -> HashMap<u32, usize> {
     let mut report = HashMap::default();
     for k in map {
-        let position = seahash::hash(&k.as_bytes()) % bloom_size;
+        let position = seahash::hash(k.as_bytes()) % bloom_size;
         let count = report.entry(db[position as usize]).or_insert(0);
         *count += 1;
     }
@@ -219,23 +217,21 @@ pub fn score_lineages(
     let mut lineage_scores = HashMap::default();
     let unclassified = (taxonomy.len() + 1) as u32;
     for key in report.keys() {
-        if *key == (0 as u32) || *key == unclassified {
+        if *key == (0_u32) || *key == unclassified {
             continue;
         } else {
-            let lineage1 = &taxonomy[&key];
+            let lineage1 = &taxonomy[key];
             for key2 in report.keys() {
-                if *key2 == (0 as u32) || *key2 == unclassified {
+                if *key2 == (0_u32) || *key2 == unclassified {
                     continue;
                 } else {
-                    let lineage2 = &taxonomy[&key2];
+                    let lineage2 = &taxonomy[key2];
                     if lineage1 == lineage2 {
                         let count = lineage_scores.entry(*key).or_insert(0);
-                        *count += &report[&key];
-                    } else {
-                        if lineage1.contains(lineage2) {
-                            let count = lineage_scores.entry(*key).or_insert(0);
-                            *count += &report[&key2];
-                        }
+                        *count += &report[key];
+                    } else if lineage1.contains(lineage2) {
+                        let count = lineage_scores.entry(*key).or_insert(0);
+                        *count += &report[key2];
                     }
                 }
             }
@@ -256,20 +252,20 @@ pub fn poll_lineages(
     let unclassified = (taxonomy.len() + 1) as u32;
     for key in report.keys() {
         let mut score = 0;
-        if *key == (0 as u32) || *key == unclassified {
+        if *key == (0_u32) || *key == unclassified {
             continue;
         } else {
-            let lineage1 = &taxonomy[&key];
+            let lineage1 = &taxonomy[key];
             for key2 in report.keys() {
-                if *key2 == (0 as u32) || *key2 == unclassified {
+                if *key2 == (0_u32) || *key2 == unclassified {
                     continue;
                 } else {
-                    let lineage2 = &taxonomy[&key2];
+                    let lineage2 = &taxonomy[key2];
                     //if lineage1 == lineage2 {
                     //    score += &report[&key];
                     //} else {
                     if lineage1.contains(lineage2) {
-                        score += &report[&key2];
+                        score += &report[key2];
                     }
                     //}
                 }
@@ -289,7 +285,7 @@ pub fn poll_lineages(
 
 #[inline]
 pub fn poll_lineages_vec(
-    report: &Vec<(u32, usize)>,
+    report: &[(u32, usize)],
     kmer_length: usize,
     lineage_graph: &HashMap<u32, u32>,
     taxonomy: &HashMap<u32, String>,
@@ -299,12 +295,12 @@ pub fn poll_lineages_vec(
     let unclassified = (taxonomy.len() + 1) as u32;
     for key in report {
         let mut score = 0;
-        if key.0 == (0 as u32) || key.0 == unclassified {
+        if key.0 == (0_u32) || key.0 == unclassified {
             continue;
         } else {
             let lineage1 = &taxonomy[&key.0];
             for key2 in report {
-                if key2.0 == (0 as u32) || key2.0 == unclassified {
+                if key2.0 == (0_u32) || key2.0 == unclassified {
                     continue;
                 } else {
                     let lineage2 = &taxonomy[&key2.0];
@@ -332,7 +328,7 @@ pub fn poll_lineages_vec(
 
 #[inline]
 pub fn poll_lineages_vec_u32(
-    report: &Vec<(u32, usize)>,
+    report: &[(u32, usize)],
     kmer_length: usize,
     lineage_graph: &HashMap<u32, u32>,
     taxonomy: &HashMap<u32, String>,
@@ -342,18 +338,16 @@ pub fn poll_lineages_vec_u32(
     let unclassified = (taxonomy.len() + 1) as u32;
     for key in report {
         let mut score = 0;
-        if key.0 == (0 as u32) || key.0 == unclassified {
+        if key.0 == (0_u32) || key.0 == unclassified {
             continue;
         } else {
             let slice_a = &super::taxonomy_u32::get_lineage_graph(key.0, lineage_graph)[..];
             let lineage1 = Set::new(slice_a).expect("could not create set1");
             for key2 in report {
-                if key2.0 == (0 as u32) || key2.0 == unclassified {
+                if key2.0 == (0_u32) || key2.0 == unclassified {
                     continue;
-                } else {
-                    if lineage1.contains(&key2.0) {
-                        score += key2.1;
-                    }
+                } else if lineage1.contains(&key2.0) {
+                    score += key2.1;
                 }
             }
         }
@@ -382,13 +376,13 @@ pub fn kmer_poll_plus(
 ) -> (u32, usize, usize) {
     let unclassified = (taxonomy.len() + 1) as u32;
     let report_length = report.len();
-    let mut tuple = (0 as u32, 0 as usize, kmer_length);
+    let mut tuple = (0_u32, 0_usize, kmer_length);
     if report_length < 2 {
         if report_length == 0 {
             return tuple;
         } else if report_length == 1 {
             for (key, value) in report {
-                if (*key == unclassified) || (*key == (0 as u32)) {
+                if (*key == unclassified) || (*key == (0_u32)) {
                     continue;
                 } else {
                     tuple = (*key, *value, kmer_length);
@@ -396,7 +390,7 @@ pub fn kmer_poll_plus(
             }
         }
     } else {
-        let lineage_scores = score_lineages(&report, &taxonomy);
+        let lineage_scores = score_lineages(report, taxonomy);
         if lineage_scores.is_empty() {
             return tuple;
         } else {
@@ -420,7 +414,7 @@ pub fn kmer_poll_plus(
                 tuple = (
                     super::taxonomy_u32::find_lca_vector_u32_numerical(
                         &top_hits,
-                        &lineage_graph,
+                        lineage_graph,
                         unclassified,
                     ),
                     count_vec[0].1.to_owned(),
@@ -437,7 +431,7 @@ pub fn vec_strings_to_string(vector_in: &[String]) -> String {
     let mut comma_separated = String::new();
     for s in vector_in {
         comma_separated.push_str(&s.to_string());
-        comma_separated.push_str(",");
+        comma_separated.push(',');
     }
     comma_separated.pop();
     comma_separated
@@ -446,6 +440,12 @@ pub fn vec_strings_to_string(vector_in: &[String]) -> String {
 pub struct SeqRead {
     pub id: String,  //id including >
     pub seq: String, // sequence
+}
+
+impl Default for SeqRead {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SeqRead {
@@ -462,6 +462,12 @@ pub struct SeqReadu8 {
     pub seq: Vec<u8>, // sequence
 }
 
+impl Default for SeqReadu8 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SeqReadu8 {
     pub fn new() -> SeqReadu8 {
         SeqReadu8 {
@@ -474,6 +480,12 @@ impl SeqReadu8 {
 pub struct SeqReadstr<'a> {
     pub id: &'a str,       //id including >
     pub seq: Vec<&'a str>, // sequence
+}
+
+impl<'a> Default for SeqReadstr<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<'a> SeqReadstr<'a> {
@@ -519,7 +531,7 @@ pub fn parallel_vec_sepia(
                 //}
             };*/
             if report.is_empty() {
-                (r.0.to_owned(), 0 as u32, 0 as usize, observations)
+                (r.0.to_owned(), 0_u32, 0_usize, observations)
             } else {
                 /*let classification = kmer_poll_plus(
                     &report,
@@ -529,7 +541,7 @@ pub fn parallel_vec_sepia(
                     &inverse_taxonomy,
                 );*/
                 let classification =
-                    poll_lineages_vec_u32(&report, observations, &lineage_graph, &taxonomy);
+                    poll_lineages_vec_u32(&report, observations, lineage_graph, taxonomy);
                 //(r.0.to_owned(), 0 as u32, 0 as usize, report.len())
                 (
                     r.0.to_owned(),
@@ -573,8 +585,8 @@ pub fn parallel_vec_sepia_pre_hll(
             if report.is_empty() {
                 (
                     r.0.to_owned(),
-                    0 as u32,
-                    0 as usize,
+                    0_u32,
+                    0_usize,
                     observations,
                     report,
                     kmer_info,
@@ -582,7 +594,7 @@ pub fn parallel_vec_sepia_pre_hll(
                 )
             } else {
                 let classification =
-                    poll_lineages_vec_u32(&report, observations, &lineage_graph, &taxonomy);
+                    poll_lineages_vec_u32(&report, observations, lineage_graph, taxonomy);
                 (
                     r.0.to_owned(),
                     classification.0,
@@ -599,138 +611,12 @@ pub fn parallel_vec_sepia_pre_hll(
     out_vec
 }
 
-#[allow(unused_assignments)]
-pub fn stream_fasta(
-    filenames: &[&str],
-    db: &[u32],
-    taxonomy: &HashMap<u32, String>,
-    lineage_graph: &HashMap<u32, u32>,
-    kmer_size: usize,
-    m_size: usize,
-    value_bits: u32,
-    batch_size: usize,
-    prefix: &str,
-    compressed_output: bool,
-) {
-    //let f = File::open(filenames[0]).expect("file not found");
-    //let iter1 = io::BufReader::new(f).lines();
-    //let mut results = Vec::new();
-    let mut results: Vec<u8> = Vec::new();
-    //let mut results_counts: HashMap<u32, usize> = HashMap::new();
-    let (f, _format) = niffler::from_path(&filenames[0]).expect("niffler choked");
-    let iter1 = io::BufReader::with_capacity(209715200, f).byte_lines();
-    //let mut l = String::with_capacity(250);
-    //let mut l = String::new();
-    let mut vec = Vec::with_capacity(batch_size);
-    let mut sub_string = String::new();
-    let search_time = SystemTime::now();
-    let mut count = 0;
-    let mut read_count = 0;
-    let mut fasta = SeqRead::new();
-    for line in iter1 {
-        //while iter1.read_line(&mut l).unwrap() > 0 {
-        let l = line.unwrap();
-        if count == 0 {
-            fasta.id = l.into_string().expect("non-UTF8 encountered in header");
-        } else {
-            if l[0] == b'>' {
-                if !sub_string.is_empty() {
-                    fasta.seq = sub_string.to_owned();
-                    vec.push((fasta.id, fasta.seq));
-                    fasta.id = l.into_string().expect("non-UTF8 encountered in header");
-                    sub_string.clear();
-                }
-            } else {
-                //sub_string.push_str(&l);
-                sub_string.push_str(&l.into_string().expect("non-UTF8 encountered in sequenc"));
-            }
-        }
-        count += 1;
-        if vec.len() % batch_size == 0 {
-            let c = parallel_vec_sepia(
-                &vec,
-                db,
-                &taxonomy,
-                &lineage_graph,
-                kmer_size,
-                m_size,
-                value_bits,
-            );
-            read_count += c.len();
-            eprint!(" {} reads classified\r", read_count);
-            //results.append(&mut c);
-            for id in c {
-                results.extend(
-                    format!("{}\t{}\t{}\t{}\n", id.0, taxonomy[&id.1], id.2, id.3).as_bytes(),
-                );
-            }
-            /*for id in c {
-                file.write_all(
-                    format!(
-                        "{}\t{}\t{}\t{}\t{}\t{}\n",
-                        id.0, id.1, id.2, id.3, id.4, id.5
-                    )
-                    .as_bytes(),
-                )
-                .expect("could not write results!");
-            }*/
-            vec.clear();
-        }
-        //l.clear();
-    }
-    //fasta.seq = sub_string;
-    vec.push((fasta.id, sub_string));
-    let c = parallel_vec_sepia(
-        &vec,
-        db,
-        &taxonomy,
-        &lineage_graph,
-        kmer_size,
-        m_size,
-        value_bits,
-    );
-    read_count += c.len();
-    //results.append(&mut c);
-    for id in c {
-        results.extend(format!("{}\t{}\t{}\t{}\n", id.0, taxonomy[&id.1], id.2, id.3).as_bytes());
-    }
-    eprint!(" {} reads classified\r", read_count);
-    match search_time.elapsed() {
-        Ok(elapsed) => {
-            eprintln!(
-                "Classified {} reads in {} seconds",
-                read_count,
-                elapsed.as_secs()
-            );
-        }
-        Err(e) => {
-            // an error occurred!
-            eprintln!("Error: {:?}", e);
-        }
-    }
-    eprintln!("Writing results to file...");
-    if compressed_output == true {
-        let mut file = BufWriter::new(GzEncoder::new(
-            File::create(format!("{}_reads.gz", prefix)).expect("could not create outfile!"),
-            Compression::default(),
-        ));
-        file.write_all(&results).expect("could not write results!");
-    } else {
-        std::fs::write(format!("{}_reads.txt", prefix), &results)
-            .expect("Can't write results to file");
-    }
-}
-
 //for benchmarking search and classification algorithms
 #[allow(unused_assignments)]
 pub fn per_read_stream_not_parallel(
     filenames: &[&str],
     db: &[u32],
-    taxonomy: &HashMap<u32, String>,
-    lineage_graph: &HashMap<u32, u32>,
-    kmer_size: usize,
-    m_size: usize, //if m and k are set to the same value this effectively makes it kmer based
-    value_bits: u32,
+    parameters: &Parameters,
     _batch_size: usize, //batch size for multi-threading
     prefix: &str,
     _qual_offset: u8, //if set to 0 can also be used for fasta
@@ -748,11 +634,11 @@ pub fn per_read_stream_not_parallel(
         read_count += 1;
         //let id = str::from_utf8(seqrec1.id()).unwrap().to_string();
         let (report, observations) = sliding_window_minimizers_sepia_vec(
-            &str::from_utf8(&seqrec1.raw_seq()).expect("could not read sequence"),
-            kmer_size,
-            m_size,
-            value_bits,
-            &db,
+            str::from_utf8(seqrec1.raw_seq()).expect("could not read sequence"),
+            parameters.k_size,
+            parameters.m_size,
+            parameters.value_bits,
+            db,
         );
         if report.is_empty() {
             results.extend(
@@ -765,12 +651,12 @@ pub fn per_read_stream_not_parallel(
             );
         } else {
             let classification =
-                poll_lineages_vec_u32(&report, observations, &lineage_graph, &taxonomy);
+                poll_lineages_vec_u32(&report, observations, &parameters.lineage_graph, &parameters.taxonomy);
             results.extend(
                 format!(
                     "{}\t{}\t{}\t{}\n",
                     str::from_utf8(seqrec1.id()).unwrap(),
-                    taxonomy[&classification.0],
+                    parameters.taxonomy[&classification.0],
                     classification.1,
                     classification.2
                 )
@@ -796,7 +682,7 @@ pub fn per_read_stream_not_parallel(
         }
     }
     eprintln!("Writing results to file...");
-    if compressed_output == true {
+    if compressed_output {
         let mut file = BufWriter::new(GzEncoder::new(
             File::create(format!("{}_reads.gz", prefix)).expect("could not create outfile!"),
             Compression::default(),
@@ -812,11 +698,7 @@ pub fn per_read_stream_not_parallel(
 pub fn per_read_stream_se(
     filenames: &[&str],
     db: &[u32],
-    taxonomy: &HashMap<u32, String>,
-    lineage_graph: &HashMap<u32, u32>,
-    kmer_size: usize,
-    m_size: usize, //if m and k are set to the same value this effectively makes it kmer based
-    value_bits: u32,
+    parameters: &Parameters,
     batch_size: usize, //batch size for multi-threading
     prefix: &str,
     qual_offset: u8, //if set to 0 can also be used for fasta
@@ -853,7 +735,7 @@ pub fn per_read_stream_se(
                 str::from_utf8(seqrec1.id()).unwrap().to_string(),
                 super::seq::qual_mask(
                     &str::from_utf8(&seqrec1.seq()).unwrap().to_string(),
-                    &str::from_utf8(&seqrec1.qual().unwrap())
+                    &str::from_utf8(seqrec1.qual().unwrap())
                         .expect("error qual reverse read")
                         .to_string(),
                     qual_offset,
@@ -865,11 +747,11 @@ pub fn per_read_stream_se(
             let c = parallel_vec_sepia_pre_hll(
                 &vec,
                 db,
-                &taxonomy,
-                &lineage_graph,
-                kmer_size,
-                m_size,
-                value_bits,
+                &parameters.taxonomy,
+                &parameters.lineage_graph,
+                parameters.k_size,
+                parameters.m_size,
+                parameters.value_bits,
             );
             eprint!("{} reads classified\r", read_count);
             for id in c {
@@ -903,7 +785,7 @@ pub fn per_read_stream_se(
                     *results_ratios.entry(id.1).or_insert(0.0) += id.2 as f64 / id.3 as f64;
                 }
                 results.extend(
-                    format!("{}\t{}\t{}\t{}\n", id.0, taxonomy[&id.1], id.2, id.3).as_bytes(),
+                    format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3).as_bytes(),
                 );
             }
             vec.clear();
@@ -912,11 +794,11 @@ pub fn per_read_stream_se(
     let c = parallel_vec_sepia_pre_hll(
         &vec,
         db,
-        &taxonomy,
-        &lineage_graph,
-        kmer_size,
-        m_size,
-        value_bits,
+        &parameters.taxonomy,
+        &parameters.lineage_graph,
+        parameters.k_size,
+        parameters.m_size,
+        parameters.value_bits,
     );
     eprint!("{} reads classified\r", read_count);
     match search_time.elapsed() {
@@ -963,9 +845,9 @@ pub fn per_read_stream_se(
         } else {
             *results_ratios.entry(id.1).or_insert(0.0) += id.2 as f64 / id.3 as f64;
         }
-        results.extend(format!("{}\t{}\t{}\t{}\n", id.0, taxonomy[&id.1], id.2, id.3).as_bytes());
+        results.extend(format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3).as_bytes());
     }
-    if compressed_output == true {
+    if compressed_output {
         let mut file = BufWriter::new(GzEncoder::new(
             File::create(format!("{}_classification.gz", prefix))
                 .expect("could not create outfile!"),
@@ -985,7 +867,7 @@ pub fn per_read_stream_se(
                     file.write_all(
                         format!(
                             "{}\t{}\t{:.3}\t{}\t{}\t{:.3}\t{}\t{:.3}\n",
-                            taxonomy[&key],
+                            parameters.taxonomy[&key],
                             value,
                             results_ratios[&key] / value as f64,
                             final_counts[&key],
@@ -1001,7 +883,7 @@ pub fn per_read_stream_se(
                     file.write_all(
                         format!(
                             "{}\t{}\t{:.3}\t{}\t{}\t{:.3}\tNA\tNA\n",
-                            taxonomy[&key],
+                            parameters.taxonomy[&key],
                             value,
                             results_ratios[&key] / value as f64,
                             final_counts[&key],
@@ -1016,7 +898,7 @@ pub fn per_read_stream_se(
                 file.write_all(
                     format!(
                         "{}\t{}\t{:.3}\t{}\n",
-                        taxonomy[&key],
+                        parameters.taxonomy[&key],
                         value,
                         results_ratios[&key] / value as f64,
                         results_total_length[&key]
@@ -1025,30 +907,28 @@ pub fn per_read_stream_se(
                 )
                 .expect("could not write results!");
             }
+        } else if hll {
+            file.write_all(
+                format!(
+                    "{}\t{}\t{:.3}\tNA\tNA\tNA\n",
+                    parameters.taxonomy[&key],
+                    value,
+                    results_ratios[&key] / value as f64,
+                )
+                .as_bytes(),
+            )
+            .expect("could not write results!");
         } else {
-            if hll {
-                file.write_all(
-                    format!(
-                        "{}\t{}\t{:.3}\tNA\tNA\tNA\n",
-                        taxonomy[&key],
-                        value,
-                        results_ratios[&key] / value as f64,
-                    )
-                    .as_bytes(),
+            file.write_all(
+                format!(
+                    "{}\t{}\t{:.3}\n",
+                    parameters.taxonomy[&key],
+                    value,
+                    results_ratios[&key] / value as f64,
                 )
-                .expect("could not write results!");
-            } else {
-                file.write_all(
-                    format!(
-                        "{}\t{}\t{:.3}\n",
-                        taxonomy[&key],
-                        value,
-                        results_ratios[&key] / value as f64,
-                    )
-                    .as_bytes(),
-                )
-                .expect("could not write results!");
-            }
+                .as_bytes(),
+            )
+            .expect("could not write results!");
         }
     }
 }
@@ -1057,11 +937,7 @@ pub fn per_read_stream_se(
 pub fn per_read_stream_pe(
     filenames: &[&str],
     db: &[u32],
-    taxonomy: &HashMap<u32, String>,
-    lineage_graph: &HashMap<u32, u32>,
-    kmer_size: usize,
-    m_size: usize, //0 == no m, otherwise minimizer
-    value_bits: u32,
+    parameters: &Parameters,
     batch_size: usize, //batch size for multi-threading
     prefix: &str,
     qual_offset: u8,
@@ -1091,7 +967,7 @@ pub fn per_read_stream_pe(
                 vec.push((
                     str::from_utf8(seqrec1.id()).unwrap().to_string(),
                     str::from_utf8(&seqrec1.seq()).unwrap().to_string()
-                        + &"N"
+                        + "N"
                         + str::from_utf8(&seqrec2.seq()).unwrap(),
                     sec_length,
                 ));
@@ -1100,14 +976,14 @@ pub fn per_read_stream_pe(
                     str::from_utf8(seqrec1.id()).unwrap().to_string(),
                     super::seq::qual_mask(
                         &str::from_utf8(&seqrec1.seq()).unwrap().to_string(),
-                        &str::from_utf8(&seqrec1.qual().unwrap())
+                        &str::from_utf8(seqrec1.qual().unwrap())
                             .expect("error qual reverse read")
                             .to_string(),
                         qual_offset,
-                    ) + &"N"
+                    ) + "N"
                         + &super::seq::qual_mask(
                             &str::from_utf8(&seqrec2.seq()).unwrap().to_string(),
-                            &str::from_utf8(&seqrec2.qual().unwrap())
+                            &str::from_utf8(seqrec2.qual().unwrap())
                                 .expect("error qual reverse read")
                                 .to_string(),
                             qual_offset,
@@ -1119,12 +995,12 @@ pub fn per_read_stream_pe(
         if vec.len() == batch_size {
             let c = parallel_vec_sepia_pre_hll(
                 &vec,
-                &db,
-                &taxonomy,
-                &lineage_graph,
-                kmer_size,
-                m_size,
-                value_bits,
+                db,
+                &parameters.taxonomy,
+                &parameters.lineage_graph,
+                parameters.k_size,
+                parameters.m_size,
+                parameters.value_bits,
             );
             eprint!("{} read pairs classified\r", read_count);
             for id in c {
@@ -1158,7 +1034,7 @@ pub fn per_read_stream_pe(
                     *results_ratios.entry(id.1).or_insert(0.0) += id.2 as f64 / id.3 as f64;
                 }
                 results.extend(
-                    format!("{}\t{}\t{}\t{}\n", id.0, taxonomy[&id.1], id.2, id.3).as_bytes(),
+                    format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3).as_bytes(),
                 );
             }
             vec.clear();
@@ -1166,12 +1042,12 @@ pub fn per_read_stream_pe(
     }
     let c = parallel_vec_sepia_pre_hll(
         &vec,
-        &db,
-        &taxonomy,
-        &lineage_graph,
-        kmer_size,
-        m_size,
-        value_bits,
+        db,
+        &parameters.taxonomy,
+        &parameters.lineage_graph,
+        parameters.k_size,
+        parameters.m_size,
+        parameters.value_bits,
     );
     eprint!("{} read pairs classified\r", read_count);
     for id in c {
@@ -1204,7 +1080,7 @@ pub fn per_read_stream_pe(
         } else {
             *results_ratios.entry(id.1).or_insert(0.0) += id.2 as f64 / id.3 as f64;
         }
-        results.extend(format!("{}\t{}\t{}\t{}\n", id.0, taxonomy[&id.1], id.2, id.3).as_bytes());
+        results.extend(format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3).as_bytes());
     }
     match search_time.elapsed() {
         Ok(elapsed) => {
@@ -1219,7 +1095,7 @@ pub fn per_read_stream_pe(
             eprintln!("Error: {:?}", e);
         }
     }
-    if compressed_output == true {
+    if compressed_output {
         let mut file = BufWriter::new(GzEncoder::new(
             File::create(format!("{}_classification.gz", prefix))
                 .expect("could not create outfile!"),
@@ -1239,7 +1115,7 @@ pub fn per_read_stream_pe(
                     file.write_all(
                         format!(
                             "{}\t{}\t{:.3}\t{}\t{}\t{:.3}\t{}\t{:.3}\n",
-                            taxonomy[&key],
+                            parameters.taxonomy[&key],
                             value,
                             results_ratios[&key] / value as f64,
                             final_counts[&key],
@@ -1255,7 +1131,7 @@ pub fn per_read_stream_pe(
                     file.write_all(
                         format!(
                             "{}\t{}\t{:.3}\t{}\t{}\t{:.3}\tNA\tNA\n",
-                            taxonomy[&key],
+                            parameters.taxonomy[&key],
                             value,
                             results_ratios[&key] / value as f64,
                             final_counts[&key],
@@ -1270,7 +1146,7 @@ pub fn per_read_stream_pe(
                 file.write_all(
                     format!(
                         "{}\t{}\t{:.3}\t{}\n",
-                        taxonomy[&key],
+                        parameters.taxonomy[&key],
                         value,
                         results_ratios[&key] / value as f64,
                         results_total_length[&key],
@@ -1279,30 +1155,28 @@ pub fn per_read_stream_pe(
                 )
                 .expect("could not write results!");
             }
+        } else if hll {
+            file.write_all(
+                format!(
+                    "{}\t{}\t{:.3}\tNA\tNA\tNA\n",
+                    parameters.taxonomy[&key],
+                    value,
+                    results_ratios[&key] / value as f64,
+                )
+                .as_bytes(),
+            )
+            .expect("could not write results!");
         } else {
-            if hll {
-                file.write_all(
-                    format!(
-                        "{}\t{}\t{:.3}\tNA\tNA\tNA\n",
-                        taxonomy[&key],
-                        value,
-                        results_ratios[&key] / value as f64,
-                    )
-                    .as_bytes(),
+            file.write_all(
+                format!(
+                    "{}\t{}\t{:.3}\n",
+                    parameters.taxonomy[&key],
+                    value,
+                    results_ratios[&key] / value as f64,
                 )
-                .expect("could not write results!");
-            } else {
-                file.write_all(
-                    format!(
-                        "{}\t{}\t{:.3}\n",
-                        taxonomy[&key],
-                        value,
-                        results_ratios[&key] / value as f64,
-                    )
-                    .as_bytes(),
-                )
-                .expect("could not write results!");
-            }
+                .as_bytes(),
+            )
+            .expect("could not write results!");
         }
     }
 }
@@ -1311,11 +1185,7 @@ pub fn per_read_stream_pe(
 pub fn per_read_stream_pe_one_file(
     filenames: &[&str],
     db: &[u32],
-    taxonomy: &HashMap<u32, String>,
-    lineage_graph: &HashMap<u32, u32>,
-    kmer_size: usize,
-    m_size: usize, //0 == no m, otherwise minimizer
-    value_bits: u32,
+    parameters: &Parameters,
     batch_size: usize, //batch size for multi-threading
     prefix: &str,
     qual_offset: u8,
@@ -1372,17 +1242,17 @@ pub fn per_read_stream_pe_one_file(
             let c = parallel_vec_sepia(
                 &vec,
                 db,
-                &taxonomy,
-                &lineage_graph,
-                kmer_size,
-                m_size,
-                value_bits,
+                &parameters.taxonomy,
+                &parameters.lineage_graph,
+                parameters.k_size,
+                parameters.m_size,
+                parameters.value_bits,
             );
             vec.clear();
             eprint!("{} read pairs classified\r", read_count);
             for id in c {
                 results.extend(
-                    format!("{}\t{}\t{}\t{}\n", id.0, taxonomy[&id.1], id.2, id.3).as_bytes(),
+                    format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3).as_bytes(),
                 );
             }
         }
@@ -1390,11 +1260,11 @@ pub fn per_read_stream_pe_one_file(
     let c = parallel_vec_sepia(
         &vec,
         db,
-        &taxonomy,
-        &lineage_graph,
-        kmer_size,
-        m_size,
-        value_bits,
+        &parameters.taxonomy,
+        &parameters.lineage_graph,
+        parameters.k_size,
+        parameters.m_size,
+        parameters.value_bits,
     );
     eprint!("{} read pairs classified\r", read_count);
     match search_time.elapsed() {
@@ -1411,9 +1281,9 @@ pub fn per_read_stream_pe_one_file(
         }
     }
     for id in c {
-        results.extend(format!("{}\t{}\t{}\t{}\n", id.0, taxonomy[&id.1], id.2, id.3).as_bytes());
+        results.extend(format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3).as_bytes());
     }
-    if compressed_output == true {
+    if compressed_output {
         let mut file = BufWriter::new(GzEncoder::new(
             File::create(format!("{}_reads.gz", prefix)).expect("could not create outfile!"),
             Compression::default(),

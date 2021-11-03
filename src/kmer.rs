@@ -24,7 +24,7 @@ pub fn read_fasta(filename: String) -> Vec<String> {
         count_line += 1;
         if line.starts_with('>') {
             let l = sub_string.to_string();
-            if l.len() > 0 {
+            if !l.is_empty() {
                 vec.push(l);
             }
             sub_string.clear();
@@ -32,7 +32,7 @@ pub fn read_fasta(filename: String) -> Vec<String> {
             let l = line.to_string();
             sub_string.push_str(&l);
             let l = sub_string.to_string();
-            if l.len() > 0 {
+            if !l.is_empty() {
                 vec.push(l);
             }
         } else {
@@ -50,15 +50,15 @@ pub fn kmerize_string_set(l: &str, k: usize) -> fnv::FnvHashSet<std::string::Str
     let length_l = l.len();
     let l_r = revcomp(&l);
     if length_l < k {
-        set
+        return set;
     } else {
         for i in 0..l.len() - k + 1 {
             if seq::has_no_n(l[i..i + k].as_bytes()) {
                 set.insert(min(&l[i..i + k], &l_r[length_l - (i + k)..length_l - i]).to_string());
             }
         }
-        set
     }
+    set
 }
 
 #[inline]
@@ -68,7 +68,7 @@ pub fn kmerize_string_set_zeroth(l: &str, k: usize) -> fnv::FnvHashSet<u64> {
     let length_l = l.len();
     let l_r = revcomp(&l);
     if length_l < k {
-        set
+        return set;
     } else {
         for i in 0..l.len() - k + 1 {
             if seq::has_no_n(l[i..i + k].as_bytes()) {
@@ -82,8 +82,8 @@ pub fn kmerize_string_set_zeroth(l: &str, k: usize) -> fnv::FnvHashSet<u64> {
                 }
             }
         }
-        set
     }
+    set
 }
 
 //from https://docs.rs/bio/0.30.0/src/bio/alphabets/dna.rs.html#52-54
@@ -117,7 +117,7 @@ pub fn sliding_window_minimizers(
 ) -> fnv::FnvHashSet<std::string::String> {
     let mut window: VecDeque<(&str, usize)> = VecDeque::new();
     let mut mset = std::collections::HashSet::default();
-    let r_seq = revcomp(&seq);
+    let r_seq = revcomp(seq);
     let length = seq.len();
     for i in 0..seq.len() - m + 1 {
         let minimizer = min(&seq[i..i + m], &r_seq[length - (i + m)..length - i]);
@@ -128,7 +128,7 @@ pub fn sliding_window_minimizers(
         while (window.front().unwrap().1 as isize) < (i as isize - k as isize + m as isize) {
             window.pop_front();
         }
-        if i >= k - m && seq::has_no_n(&seq[i - (k - m)..i + m].as_bytes()) {
+        if i >= k - m && seq::has_no_n(seq[i - (k - m)..i + m].as_bytes()) {
             mset.insert(window.front().unwrap().0.to_string().to_uppercase());
         }
     }
@@ -136,7 +136,7 @@ pub fn sliding_window_minimizers(
 }
 
 pub fn sliding_window_minimizersi_zeroth(
-    v: &Vec<String>,
+    v: &[String],
     k: usize,
     m: usize,
 ) -> std::collections::HashSet<u64> {
@@ -146,7 +146,7 @@ pub fn sliding_window_minimizersi_zeroth(
             continue;
         }
         let mut window: VecDeque<(&str, usize)> = VecDeque::new();
-        let r_seq = revcomp(&seq);
+        let r_seq = revcomp(seq);
         let length = seq.len();
         for i in 0..seq.len() - m + 1 {
             let minimizer = min(&seq[i..i + m], &r_seq[length - (i + m)..length - i]);
@@ -154,12 +154,12 @@ pub fn sliding_window_minimizersi_zeroth(
                 window.pop_back();
             }
             window.push_back((minimizer, i));
-            while window.front().unwrap().1 as isize <= i as isize - k as isize + m as isize - 1 {
+            while (window.front().unwrap().1 as isize) < i as isize - k as isize + m as isize {
                 window.pop_front();
             }
-            if i >= k - m && seq::has_no_n(&seq[i - (k - m)..i + m].as_bytes()) {
+            if i >= k - m && seq::has_no_n(seq[i - (k - m)..i + m].as_bytes()) {
                 let hash = seahash::hash(
-                    &window
+                    window
                         .front()
                         .unwrap()
                         .0
@@ -221,13 +221,9 @@ fn reverse_complement(kmer: u64, kmer_size: usize) -> u64 {
     // swap halves of 64-bit word
     kmer = (kmer >> 32) | (kmer << 32);
     // Then complement
-    ((!kmer) >> (8 * 8 - kmer_size * 2)) & (((1 as u64) << (kmer_size * 2)) - 1)
+    ((!kmer) >> (8 * 8 - kmer_size * 2)) & (((1_u64) << (kmer_size * 2)) - 1)
 }
-/*
-uint64_t MinimizerScanner::canonical_representation(uint64_t kmer, uint8_t n) {
-  uint64_t revcom = reverse_complement(kmer, n);
-  return kmer < revcom ? kmer : revcom;
-}*/
+
 //from kraken2
 #[inline]
 pub fn canonical(kmer: u64, kmer_size: usize) -> u64 {
@@ -264,8 +260,7 @@ pub fn sliding_window_minimizers_skip_n_u64(seq: &str, k: usize, m: usize) -> Ve
                     window.pop_back(); // we pop the last one
                 }
                 window.push_back((minimizer, i)); // and make add a pair with the new value at the end
-                while window.front().unwrap().1 as isize <= i as isize - k as isize + m as isize - 1
-                {
+                while (window.front().unwrap().1 as isize) < i as isize - k as isize + m as isize {
                     window.pop_front(); // pop the first one
                 }
                 if i >= k {
@@ -305,7 +300,7 @@ pub fn sliding_window_numerical_zeroth(
             continue;
         }
         let seq = &sequence.to_uppercase();
-        let both_strands = [seq, &revcomp(&seq)];
+        let both_strands = [seq, &revcomp(seq)];
         let mut window: VecDeque<(u64, usize)> = VecDeque::new();
         let length = seq.len();
         let mut counter = 0;
@@ -331,8 +326,8 @@ pub fn sliding_window_numerical_zeroth(
                             window.pop_back(); // we pop the last one
                         }
                         window.push_back((minimizer, i)); // and make add a pair with the new value at the end
-                        while window.front().unwrap().1 as isize
-                            <= i as isize - k as isize + m as isize - 1
+                        while (window.front().unwrap().1 as isize)
+                            < i as isize - k as isize + m as isize
                         {
                             window.pop_front(); // pop the first one
                         }

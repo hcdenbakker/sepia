@@ -27,6 +27,7 @@ pub struct Parameters {
     pub value_bits: u32,
     pub lineage_graph: HashMap<u32, u32>,
     pub mode: String,
+    pub taxonomy: HashMap<u32, String>
 }
 
 pub fn read_parameters_phf(path: &str) -> Parameters {
@@ -172,8 +173,7 @@ pub fn build_vector_parallel_mutex(
     processed += vec.len();
     eprint!("processed {}/{} accessions\r", processed, map_length);
 
-    let db = db.into_inner().unwrap();
-    db
+    db.into_inner().unwrap()
 }
 
 #[allow(unused_assignments)]
@@ -268,10 +268,10 @@ pub fn hash_fingerprints(
     gamma: f64, //5.0 default?
 ) -> (Mphf<u64>, Vec<u32>) {
     eprintln!("Estimating total number of unique kmers/minimizers...");
-    let accessions_estimate = zeroth(&map, kmer_size, m_size, batch);
+    let accessions_estimate = zeroth(map, kmer_size, m_size, batch);
     let vector_size = (accessions_estimate as f64 / 0.9) as usize;
     eprintln!("Estimated number of minimizers: {}\nInitial size of compact hash set set to {}\nInferring unique minimizers...", accessions_estimate, vector_size);
-    let mut hash_vector = build_vector_parallel(&map, vector_size, kmer_size, m_size, batch);
+    let mut hash_vector = build_vector_parallel(map, vector_size, kmer_size, m_size, batch);
     eprintln!("Removal of unused (0) entries...");
     hash_vector.retain(|&x| x != 0);
     eprintln!(
@@ -303,7 +303,7 @@ pub fn hash_fingerprints(
     let hash_vector_length = hash_vector.len();
     for h in hash_vector {
         let idx = phf.try_hash(&h).unwrap() as usize;
-        finger_prints[idx] = bit_magic::populate(h, 0 as u32, value_bits);
+        finger_prints[idx] = bit_magic::populate(h, 0_u32, value_bits);
         finger_counter += 1;
         if finger_counter % 1000 == 0 {
             eprint!(
@@ -364,7 +364,7 @@ pub fn build_db_bits_parallel_phf_mutex(
                                 //&taxonomy,
                                 //&lookup,
                                 unclassified,
-                                &lineage_graph,
+                                lineage_graph,
                                 &phf,
                                 m,
                                 accession_lineage,
@@ -423,7 +423,7 @@ pub fn build_db_bits_parallel_phf_mutex(
                         //&taxonomy,
                         //&lookup,
                         unclassified,
-                        &lineage_graph,
+                        lineage_graph,
                         &phf,
                         m,
                         accession_lineage,
@@ -516,7 +516,7 @@ pub fn build_db_bits_parallel_phf(
                         //&taxonomy,
                         //&lookup,
                         unclassified,
-                        &lineage_graph,
+                        lineage_graph,
                         &phf,
                         k,
                         accession_lineage,
@@ -558,7 +558,7 @@ pub fn build_db_bits_parallel_phf(
                 //&taxonomy,
                 //&lookup,
                 unclassified,
-                &lineage_graph,
+                lineage_graph,
                 &phf,
                 k,
                 accession_lineage,
@@ -587,7 +587,7 @@ pub fn build_db_bits_parallel_sepia(
     let unclassified = (taxonomy.len() + 1) as u32;
     let value_bits = (((unclassified as f64).log(10.0) / 2_f64.log(10.0)).floor() + 1.0) as u32;
     eprintln!("Estimating total number of unique kmers/minimizers...");
-    let accessions_estimate = zeroth(&accessions, kmer_size, m_size, batch);
+    let accessions_estimate = zeroth(accessions, kmer_size, m_size, batch);
     let vector_size = (accessions_estimate as f64 / 0.7) as usize;
     println!(
         "Estimated index size: {:.3} Gb",
@@ -613,10 +613,9 @@ pub fn build_db_bits_parallel_sepia(
     let mut vec = Vec::with_capacity(batch);
     for accession in accessions {
         let accession_plus_root = "root;".to_owned() + &accession[1];
-        let accession_lineage = lookup.get(&accession_plus_root).expect(&format!(
-            "Could not find {} in lookup hash",
-            &accession_plus_root
-        ));
+        let accession_lineage = lookup
+            .get(&accession_plus_root)
+            .unwrap_or_else(|| panic!("Could not find {} in lookup hash", &accession_plus_root));
         vec.push((accession_lineage, accession[0].to_owned()));
         if vec.len() % batch == 0 {
             let mut out_vec: Vec<_> = vec![];
@@ -660,7 +659,7 @@ pub fn build_db_bits_parallel_sepia(
                         //&taxonomy,
                         //&lookup,
                         unclassified,
-                        &lineage_graph,
+                        lineage_graph,
                         //&phf,
                         k,
                         accession_lineage,
@@ -711,7 +710,7 @@ pub fn build_db_bits_parallel_sepia(
                 //&taxonomy,
                 //&lookup,
                 unclassified,
-                &lineage_graph,
+                lineage_graph,
                 //&phf,
                 k,
                 accession_lineage,
