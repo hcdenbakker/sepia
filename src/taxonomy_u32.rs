@@ -37,7 +37,7 @@ pub fn taxonomy_map_level_agnostic(
     let mut taxon_lineage: Vec<(String, String)> = Vec::new();
     for lineage in taxonomy_vector {
         let v: Vec<&str> = lineage.split(';').collect();
-        lineage_u32.push(1 as u32);
+        lineage_u32.push(1_u32);
         lineage_string.push("root".to_string());
         for taxon in v {
             //this is going to be problematic is a taxon name is found in multiple lineages! Take the whole lineage as node name
@@ -60,8 +60,8 @@ pub fn taxonomy_map_level_agnostic(
         lineage_string.clear();
     }
     let unclassified = (map.len() + 1) as u32; //maybe root?
-    map.insert(0 as u32, "no hits".to_string());
-    map_inv.insert("no hits".to_string(), 0 as u32);
+    map.insert(0_u32, "no hits".to_string());
+    map_inv.insert("no hits".to_string(), 0_u32);
     map.insert(unclassified, "unclassified".to_string());
     map_inv.insert("unclassified".to_string(), unclassified);
     (map, map_inv, taxonomy_graph, taxon_lineage)
@@ -70,7 +70,7 @@ pub fn taxonomy_map_level_agnostic(
 pub fn get_lineage_graph(query: u32, graph: &HashMap<u32, u32>) -> Vec<u32> {
     let mut stop = false;
     let mut lineage = vec![query];
-    while stop == false {
+    while !stop {
         let value = graph.get(&lineage[lineage.len() - 1]);
         if value == None {
             stop = true;
@@ -112,7 +112,7 @@ pub fn b_is_a_ancestor_of_a(taxon_a: u32, taxon_b: u32, graph: &HashMap<u32, u32
 }
 
 pub fn find_lca_vector_u32_numerical(
-    taxa: &Vec<u32>,
+    taxa: &[u32],
     graph: &HashMap<u32, u32>,
     unclassified: u32,
 ) -> u32 {
@@ -121,7 +121,7 @@ pub fn find_lca_vector_u32_numerical(
         //let  mut new = "";
         first = find_lca_u32(first, *t, graph, unclassified);
         //first = &new;
-        if first == 0 as u32 {
+        if first == 0_u32 {
             break;
         }
     }

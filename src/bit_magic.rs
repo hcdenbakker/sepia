@@ -36,9 +36,9 @@ pub fn second_hash(first_hash: u64) -> u64 {
 #[inline]
 pub fn get_phf(key: &u64, table: &[u32], phf: &Mphf<u64>, value_bits: u32) -> u32 {
     //let hc = seahash::hash(&key.as_bytes());
-    let x = phf.try_hash(&key);
+    let x = phf.try_hash(key);
     if x.is_none() {
-        0 as u32
+        0_u32
     } else {
         //let compacted_key = (key >> (32 + value_bits)) as u32;
         //we flip this around
@@ -46,18 +46,18 @@ pub fn get_phf(key: &u64, table: &[u32], phf: &Mphf<u64>, value_bits: u32) -> u3
         let idx = x.unwrap() as usize;
         if value(table[idx], value_bits) == 0 {
             //we do not expect this to happen
-            0 as u32
+            0_u32
         } else if hashed_key(table[idx], value_bits) == compacted_key {
             value(table[idx], value_bits)
         } else {
-            0 as u32
+            0_u32
         }
     }
 }
 
 #[inline]
 pub fn get_sepia(key: &u64, table: &[u32], capacity: usize, value_bits: u32) -> u32 {
-    let hc = murmurhash3(&key);
+    let hc = murmurhash3(key);
     //let hc = seahash::hash(&key.to_ne_bytes());
     let compacted_key = (hc >> (32 + value_bits)) as u32;
     //let compacted_key = ((key << value_bits) as u32) >> value_bits;
@@ -86,7 +86,7 @@ pub fn get_sepia(key: &u64, table: &[u32], capacity: usize, value_bits: u32) -> 
         //    break;
         // } // search over, we've exhausted the table
     }
-    0 as u32
+    0_u32
 }
 
 #[inline]
@@ -111,7 +111,7 @@ pub fn compare_and_store(table: &mut Vec<u64>, key: u64, capacity: usize) -> boo
             search_successful = true;
             set_successful = true;
         }
-        if table[idx] == 0 as u64 {
+        if table[idx] == 0_u64 {
             table[idx] = key;
             search_successful = true;
             set_successful = true;
@@ -203,7 +203,7 @@ pub fn compare_and_set_phf_u32(
             //let unclassified = (taxonomy.len() + 1) as u32; // infer in main function!
             //let mut idx = hc as usize % capacity;
             //let idx = phf.try_hash(&hc).unwrap() as usize;
-            if value(table[idx], value_bits) == 0 as u32 {
+            if value(table[idx], value_bits) == 0_u32 {
                 table[idx] = populate(key, new_value, value_bits);
                 set_successful = true;
             } else if hashed_key(table[idx], value_bits) == compacted_key {
@@ -216,7 +216,7 @@ pub fn compare_and_set_phf_u32(
                     let lca = super::taxonomy_u32::find_lca_u32(
                         new_value,
                         old_value,
-                        &lineage_graph,
+                        lineage_graph,
                         unclassified,
                     );
                     table[idx] = populate(key, lca, value_bits);
@@ -250,7 +250,7 @@ pub fn compare_and_set_sepia(
     let first_idx = idx;
     let mut step = 0;
     while !search_successful {
-        if table[idx] == 0 as u32 {
+        if table[idx] == 0_u32 {
             table[idx] = populate_sepia(hc, new_value, value_bits);
             search_successful = true;
             set_successful = true;
@@ -261,20 +261,18 @@ pub fn compare_and_set_sepia(
             if new_value == old_value {
                 search_successful = true;
                 set_successful = true
+            } else if old_value == unclassified {
+                search_successful = true;
             } else {
-                if old_value == unclassified {
-                    search_successful = true;
-                } else {
-                    let lca = super::taxonomy_u32::find_lca_u32(
-                        new_value,
-                        old_value,
-                        &lineage_graph,
-                        unclassified,
-                    );
-                    table[idx] = populate_sepia(hc, lca, value_bits);
-                    search_successful = true;
-                    set_successful = true;
-                }
+                let lca = super::taxonomy_u32::find_lca_u32(
+                    new_value,
+                    old_value,
+                    lineage_graph,
+                    unclassified,
+                );
+                table[idx] = populate_sepia(hc, lca, value_bits);
+                search_successful = true;
+                set_successful = true;
             }
         } //else {
         if step == 0 {
@@ -292,5 +290,5 @@ pub fn compare_and_set_sepia(
         //}
         // }
     }
-    return set_successful;
+    set_successful
 }
