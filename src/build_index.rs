@@ -591,11 +591,11 @@ pub fn build_db_bits_parallel_sepia(
     let vector_size = (accessions_estimate as f64 / 0.7) as usize;
     println!(
         "Estimated index size: {:.3} Gb",
-        (vector_size as f64 / 4.0) / 1073741824.0
+        (vector_size as f64 * 4.0) / 1073741824.0
     );
     let mut sys = System::new_all();
     sys.refresh_all();
-    let estimated_size_index = (vector_size as f64 / 4.0) / 1048576.0; // in KB
+    let estimated_size_index = (vector_size as f64 * 4.0) / 1048576.0; // in KB
     let ram = sys.total_memory();
     if estimated_size_index > ram as f64 {
         eprintln!(
