@@ -92,6 +92,20 @@ For the demo we build an index of the Salmonella and Escherichia references usin
 This creates an index called 'demo_index'. Alternatively we can build an index if the `-M boom` option, which will create a smaller index with a perfect hash function. While the index is smaller with a perfect hash function,
 the amount of RAM needed to build it is considerably larger, this is one of the experimental elements of Sepia.
 
+In the index directory/folder you will find a text file reporting potential taxonomic incongruities called `taxonomy_ambiguities.txt`. It is up to the user to solve these incongruities if necessary, for example:
+```
+s__Hypnum_recurvatum:
+root;k__Viridiplantae;p__Bryophyta;c__Bryopsida;o__Hypnales;f__Hypnaceae;g__Drepanium/s__Hypnum_recurvatum
+root;k__Viridiplantae;p__Bryophyta;c__Bryopsida;o__Hypnales;f__Hypnaceae;g__Hypnum/s__Hypnum_recurvatum
+```
+In this case the species name `s__Hypnum_recurvatum` is found in two different lineages, once in the genus `g__Drepanium`, and once (as expected) in the genus `g__Hypnum`. This clearly a situation that needs to be corrected, as it may affect the accuracy of Sepia to classify reads belonging to either `g__Drepanium` or `g__Hypnum`. Here is another example that does not need correction:
+```
+g__Gomphus:
+root;k__Metazoa;p__Arthropoda;c__Insecta;o__Odonata;f__Gomphidae/g__Gomphus
+root;k__Fungi;p__Basidiomycota;c__Agaricomycetes;o__Gomphales;f__Gomphaceae/g__Gomphus
+```
+In this case the genus `g__Gomphus` is found in two lineages; (i) a lineage leading up to a family of Dragonflies (`f__Gomphidae`) and (ii) a lineage leading up a family of ectomycorrhizal mushrooms (`f__Gomphaceae`). This happens quite often when taxonomies that are covered by different nomenclature codes (https://en.wikipedia.org/wiki/Nomenclature_codes) are combined in one index. Taxonomies in Sepia are encoded in such a way that this should not pose a problem.   
+
 
 ## Classifying reads
 ```
@@ -169,5 +183,3 @@ To run sepia in batch mode we now do:
 
 The suffix will be included in the output file, I usually use it to show in the output files which index I used. Currently the batch function cannot be used on interleaved paired end files, these will be treated as single end files.  
 
-### To do:
-1. Check available memory before index is created or loaded
