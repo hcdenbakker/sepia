@@ -1,4 +1,4 @@
-[![Build Status](https://app.travis-ci.com/hcdenbakker/sepia.svg?branch=main)](https://app.travis-ci.com/hcdenbakker/sepia)
+[![Continuous Integration](https://github.com/hcdenbakker/sepia/actions/workflows/rust.yml/badge.svg)](https://github.com/hcdenbakker/sepia/actions/workflows/rust.yml)
 
 # Sepia
 Sepia is a (taxonomic) read classifier written in Rust based on (extensions) of the kraken2 algorithms (https://github.com/DerrickWood/kraken2), hence the name Sepia (just like the kraken a cephalopod, and the rust colored
@@ -6,36 +6,21 @@ pigment derived from it's ink sac). The reason I wrote Sepia is to create a soft
 novel algorithms or data structures, and has features I would like myself (e.g., a fast batch mode).
 
 ## Installation
+### Precompiled binaries
 Download one of the precompiled binaries (currently only for macOS and Linux), or compile it yourself:
+### Install from source:
 1. Install Rust (https://www.rust-lang.org/)
 2. Clone the sepia repository:
-	`git clone https://github.com/hcdenbakker/sepia.git`
+	```
+	git clone https://github.com/hcdenbakker/sepia.git
+	```
 3. Compile sepia with `cargo` (Rust's compiler):
-`cd sepia; cargo build --release`
+   ```
+    cd sepia; cargo build --release
+    ```
 
- ## Running Sepia
- 
- Sepia works with subcommands, using `-h` or `--help` will get you extensive documentation:
- ```
- sepia 0.0.1.
-Henk C. den Bakker <henkcdenbakker@gmail.com>
-perfect hash index based read classifyer
-
-USAGE:
-    sepia [SUBCOMMAND]
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-SUBCOMMANDS:
-    batch_classify    classifies batch of samples reads
-    build             builds an index
-    classify          classifies reads using an lca approach
-    help              Prints this message or the help of the given subcommand(s)
- ```   
- 
- ### Building an index 
+## Running Sepia
+### Building an index 
 
 To build an index you need collection of reference files (I masked low complexity regions using NCBI's DustMasker (https://www.ncbi.nlm.nih.gov/IEB/ToolBox/CPP_DOC/lxr/source/src/app/dustmasker/)
  in the 'masked folder') and a tab delimited file with the path to the reference file and the taxonomy string of the reference file. In the `ref_demo.txt` file you will find an example of what this
@@ -183,3 +168,23 @@ To run sepia in batch mode we now do:
 
 The suffix will be included in the output file, I usually use it to show in the output files which index I used. Currently the batch function cannot be used on interleaved paired end files, these will be treated as single end files.  
 
+## Help function
+Using `-h` or `--help` will get you extensive documentation on sepia and its subcommands, for example this is what you get when you type `sepia` or `sepia -h`:
+ ```
+sepia 0.0.1.
+Henk C. den Bakker <henkcdenbakker@gmail.com>
+perfect hash index based read classifyer
+
+USAGE:
+    sepia [SUBCOMMAND]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+SUBCOMMANDS:
+    batch_classify    classifies batch of samples reads
+    build             builds an index
+    classify          classifies reads using an lca approach
+    help              Prints this message or the help of the given subcommand(s)
+ ```   
