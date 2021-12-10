@@ -24,14 +24,14 @@ static GLOBAL: System = System;
 
 fn main() {
     let matches = App::new("sepia")
-            .version("0.1.0")
+            .version("1.0.0")
             .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
             .about("a taxonomy centered read classifier and more")
             .setting(AppSettings::ArgRequiredElseHelp)
             .subcommand(
                 SubCommand::with_name("build")
                     .about("builds an index")
-                    .version("0.1")
+                    .version("1.0")
                     .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
                     .setting(AppSettings::ArgRequiredElseHelp)
                     .arg(
@@ -104,7 +104,7 @@ fn main() {
             .subcommand(
                 SubCommand::with_name("classify")
                     .about("classifies reads using an lca approach")
-                    .version("0.1")
+                    .version("1.0")
                     .author("Henk den Bakker. <henkcdenbakker@gmail.com>")
                     .setting(AppSettings::ArgRequiredElseHelp)
                     .arg(
@@ -185,7 +185,7 @@ fn main() {
             .subcommand(
             SubCommand::with_name("batch_classify")
                 .about("classifies batch of samples reads")
-                .version("0.2")
+                .version("1.0")
                 .author("Henk den Bakker. <henkcdenbakker@gmail.com>")
                 .setting(AppSettings::ArgRequiredElseHelp)
                 .arg(
