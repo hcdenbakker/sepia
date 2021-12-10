@@ -24,9 +24,9 @@ static GLOBAL: System = System;
 
 fn main() {
     let matches = App::new("sepia")
-            .version("0.0.3.")
+            .version("0.1.0")
             .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
-            .about("perfect hash index based read classifier and more")
+            .about("a taxonomy centered read classifier and more")
             .setting(AppSettings::ArgRequiredElseHelp)
             .subcommand(
                 SubCommand::with_name("build")
