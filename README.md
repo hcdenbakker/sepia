@@ -7,7 +7,7 @@ novel algorithms or data structures, and has features I would like myself (e.g.,
 
 ## Installation
 ### Precompiled binaries
-Download one of the precompiled binaries (currently only for macOS and Linux), or compile it yourself:
+Download one of the precompiled binaries (currently only for macOS and Linux) [here](https://github.com/hcdenbakker/sepia/releases).
 ### Install from source:
 1. Install Rust (https://www.rust-lang.org/)
 2. Clone the sepia repository:
