@@ -1,4 +1,5 @@
 [![Continuous Integration](https://github.com/hcdenbakker/sepia/actions/workflows/rust.yml/badge.svg)](https://github.com/hcdenbakker/sepia/actions/workflows/rust.yml)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.03839/status.svg)](https://doi.org/10.21105/joss.03839)
 
 # Sepia
 Sepia is a (taxonomic) read classifier written in Rust based on (extensions) of the kraken2 algorithms (https://github.com/DerrickWood/kraken2), hence the name Sepia (just like the kraken a cephalopod, and the rust colored
