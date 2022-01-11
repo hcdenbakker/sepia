@@ -1,5 +1,6 @@
 use super::seq;
 use fnv;
+use needletail::parse_fastx_file;
 use std;
 use std::cmp::min;
 use std::collections::VecDeque;
@@ -356,6 +357,83 @@ pub fn sliding_window_numerical_zeroth(
                     break;
                 }
                 i += 1;
+            }
+        }
+    }
+    mset
+}
+
+#[inline]
+pub fn sliding_window_zeroth_nt(v: &String, k: usize, m: usize) -> std::collections::HashSet<u64> {
+    let mut mset = std::collections::HashSet::default();
+    let mut reader1 = parse_fastx_file(v).expect("invalid path/file");
+    while let Some(record1) = reader1.next() {
+        let seqrec1 = record1.expect("invalid record in forward file");
+        if seqrec1.seq().len() < k {
+            continue;
+        } else {
+            let seq = &std::str::from_utf8(&seqrec1.seq())
+                .unwrap()
+                .to_string()
+                .to_uppercase();
+            let both_strands = [seq, &revcomp(seq)];
+            let mut window: VecDeque<(u64, usize)> = VecDeque::new();
+            let length = seq.len();
+            let mut counter = 0;
+            let mut i = 1;
+            let mut candidate: u64 = 0;
+            let mut mask: u64 = 1;
+            mask <<= m * 2;
+            mask -= 1;
+            let toggle = TOGGLE & mask;
+            for s in &both_strands {
+                for n in s.bytes() {
+                    //for j in seq[i..i + m].bytes(){
+                    let new_char = nuc_to_number(n);
+                    if new_char < 4 {
+                        candidate <<= 2;
+                        candidate |= new_char;
+                        counter += 1;
+                        if counter >= m {
+                            candidate &= mask;
+                            let mut minimizer = canonical(candidate, m);
+                            minimizer ^= toggle;
+                            while !window.is_empty() && window.back().unwrap().0 > minimizer {
+                                window.pop_back(); // we pop the last one
+                            }
+                            window.push_back((minimizer, i)); // and make add a pair with the new value at the end
+                            while (window.front().unwrap().1 as isize)
+                                < i as isize - k as isize + m as isize
+                            {
+                                window.pop_front(); // pop the first one
+                            }
+                            if i >= k {
+                                //if has_no_n(&seq[i - (k - m)..i + m].as_bytes()) {
+                                //we do not want to include minimers from kmers with an N
+                                //change minimizer into u64
+                                //vec.push(window.front().unwrap().0);
+                                let hash = seahash::hash(
+                                    &(window.front().unwrap().0 ^ toggle).to_ne_bytes(),
+                                );
+                                if (hash & 1023) < 4 {
+                                    mset.insert(hash);
+                                }
+                                //}
+                            }
+                        }
+                    } else {
+                        // we have an ambiguous character: reset counter, empty queue
+                        counter = 0;
+                        i = 0;
+                        candidate = 0;
+                        window.clear();
+                    }
+                    // }
+                    if i == length {
+                        break;
+                    }
+                    i += 1;
+                }
             }
         }
     }

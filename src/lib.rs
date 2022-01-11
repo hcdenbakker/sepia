@@ -24,3 +24,5 @@ pub mod direct_read_write;
 pub mod classify_batch;
 
 pub mod classify_batch_sepia;
+
+pub mod read_filter;

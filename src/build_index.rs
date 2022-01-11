@@ -3,6 +3,7 @@ use super::kmer;
 use super::zeroth::zeroth;
 use bincode::deserialize_from;
 use boomphf::*;
+use needletail::parse_fastx_file;
 
 use fnv;
 use hashbrown::HashMap;
@@ -27,7 +28,7 @@ pub struct Parameters {
     pub value_bits: u32,
     pub lineage_graph: HashMap<u32, u32>,
     pub mode: String,
-    pub taxonomy: HashMap<u32, String>
+    pub taxonomy: HashMap<u32, String>,
 }
 
 pub fn read_parameters_phf(path: &str) -> Parameters {
@@ -622,15 +623,21 @@ pub fn build_db_bits_parallel_sepia(
             out_vec = vec
                 .par_iter()
                 .map(|r| {
-                    let fasta_vec = kmer::read_fasta(r.1.to_owned());
+                    //let fasta_vec = kmer::read_fasta(r.1.to_owned());
                     let mut kmers: std::collections::HashSet<u64> =
                         std::collections::HashSet::default();
-                    for f in fasta_vec {
-                        if f.len() < kmer_size {
+                    let mut reader1 = parse_fastx_file(&r.1.to_owned()).expect("invalid path/file");
+                    while let Some(record1) = reader1.next() {
+                        let seqrec1 = record1.expect("invalid record in reference file");
+                        //for f in fasta_vec {
+                        if seqrec1.seq().len() < kmer_size {
                             continue;
                         } else {
-                            let mmers =
-                                kmer::sliding_window_minimizers_skip_n_u64(&f, kmer_size, m_size);
+                            let mmers = kmer::sliding_window_minimizers_skip_n_u64(
+                                &std::str::from_utf8(&seqrec1.seq()).unwrap().to_string(),
+                                kmer_size,
+                                m_size,
+                            );
                             for m in mmers {
                                 kmers.insert(m);
                             }
@@ -638,7 +645,9 @@ pub fn build_db_bits_parallel_sepia(
                             //its reverse complement; this emeliorates potential differences
                             //(between ~1 and ~5% of the minimizers
                             let mmers_rc = kmer::sliding_window_minimizers_skip_n_u64(
-                                &kmer::revcomp(&f),
+                                &kmer::revcomp(
+                                    &std::str::from_utf8(&seqrec1.seq()).unwrap().to_string(),
+                                ),
                                 kmer_size,
                                 m_size,
                             );
@@ -678,18 +687,25 @@ pub fn build_db_bits_parallel_sepia(
     out_vec = vec
         .par_iter()
         .map(|r| {
-            let fasta_vec = kmer::read_fasta(r.1.to_owned());
+            //let fasta_vec = kmer::read_fasta(r.1.to_owned());
             let mut kmers: std::collections::HashSet<u64> = std::collections::HashSet::default();
-            for f in fasta_vec {
-                if f.len() < kmer_size {
+            let mut reader1 = parse_fastx_file(&r.1.to_owned()).expect("invalid path/file");
+            //for f in fasta_vec {
+            while let Some(record1) = reader1.next() {
+                let seqrec1 = record1.expect("invalid record in reference file");
+                if seqrec1.seq().len() < kmer_size {
                     continue;
                 } else {
-                    let mmers = kmer::sliding_window_minimizers_skip_n_u64(&f, kmer_size, m_size);
+                    let mmers = kmer::sliding_window_minimizers_skip_n_u64(
+                        &std::str::from_utf8(&seqrec1.seq()).unwrap().to_string(),
+                        kmer_size,
+                        m_size,
+                    );
                     for m in mmers {
                         kmers.insert(m);
                     }
                     let mmers_rc = kmer::sliding_window_minimizers_skip_n_u64(
-                        &kmer::revcomp(&f),
+                        &kmer::revcomp(&std::str::from_utf8(&seqrec1.seq()).unwrap().to_string()),
                         kmer_size,
                         m_size,
                     );
