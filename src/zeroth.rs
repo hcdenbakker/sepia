@@ -14,7 +14,7 @@ pub fn zeroth(entries: &[Vec<String>], k: usize, m: usize, c: usize) -> usize {
             //let mut out_vec: Vec<_> = vec![];
             //out_vec = vec
             vec.par_iter_mut().for_each(|r| {
-                let fasta_vec = kmer::read_fasta(r.to_owned());
+                //let fasta_vec = kmer::read_fasta(r.to_owned());
                 /*if m == 0 {
                     let mmers = kmer_vector(&fasta_vec, k);
                     let mut mini_set = mini_set.lock().unwrap();
@@ -22,7 +22,7 @@ pub fn zeroth(entries: &[Vec<String>], k: usize, m: usize, c: usize) -> usize {
                         mini_set.insert(hash);
                     }
                 } else {*/
-                let mmers = kmer::sliding_window_numerical_zeroth(&fasta_vec, k, m);
+                let mmers = kmer::sliding_window_zeroth_nt(&r, k, m);
                 let mut mini_set = mini_set.lock().unwrap();
                 for hash in mmers {
                     mini_set.insert(hash);
@@ -44,7 +44,7 @@ pub fn zeroth(entries: &[Vec<String>], k: usize, m: usize, c: usize) -> usize {
     //let mut out_vec: Vec<_> = vec![];
     //out_vec = vec
     vec.par_iter_mut().for_each(|r| {
-        let fasta_vec = kmer::read_fasta(r.to_owned());
+        //let fasta_vec = kmer::read_fasta(r.to_owned());
         /*if m == 0 {
             let mmers = kmer_vector(&fasta_vec, k);
             let mut mini_set = mini_set.lock().unwrap();
@@ -52,7 +52,7 @@ pub fn zeroth(entries: &[Vec<String>], k: usize, m: usize, c: usize) -> usize {
                 mini_set.insert(hash);
             }
         } else {*/
-        let mmers = kmer::sliding_window_numerical_zeroth(&fasta_vec, k, m);
+        let mmers = kmer::sliding_window_zeroth_nt(&r, k, m);
         let mut mini_set = mini_set.lock().unwrap();
         for hash in mmers {
             mini_set.insert(hash);
