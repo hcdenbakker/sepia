@@ -239,6 +239,11 @@ pub fn read_filter_se_nt(
     prefix: &str,
     exclude: bool,
 ) {
+    if class_map.is_empty() && ratio_map.is_empty() && exclude == false{
+        println!("No read-pairs matching the inclusion criteria for {}, exiting with 0 now.", filenames[0]);
+        std::process::exit(0x0100);
+
+    }
     let mut total = 0;
     let mut excluded = 0;
     let mut included = 0;
@@ -350,6 +355,12 @@ pub fn read_filter_pe_nt(
     prefix: &str,
     exclude: bool,
 ) {
+    //if none of the inclusion criteria are met, print there is nothing to include and exit with 0
+    if class_map.is_empty() && ratio_map.is_empty() && exclude == false{
+        println!("No read-pairs matching the inclusion criteria for {} and {}, exiting with 0 now.", filenames[0], filenames[1]);
+        std::process::exit(0x0100);
+
+    }
     let mut total = 0;
     let mut excluded = 0;
     let mut included = 0;

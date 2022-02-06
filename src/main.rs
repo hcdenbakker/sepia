@@ -747,7 +747,7 @@ fn main() {
         let classification = matches.value_of("classification").unwrap();
         let files: Vec<_> = matches.values_of("files").unwrap().collect();
         let taxon = matches.value_of("taxon").unwrap_or("nonsense");
-        let ratio = value_t!(matches, "ratio", f64).unwrap_or(0.0);
+        let ratio = value_t!(matches, "ratio", f64).unwrap_or(1.1);
         //let prefix = matches.value_of("prefix").unwrap();
         let exclude = matches.is_present("exclude");
         let exact = matches.is_present("exact");
