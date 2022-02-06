@@ -46,6 +46,41 @@ pub fn tab_to_map(
     (class_map, ratio_map)
 }
 
+pub fn tab_to_set(
+    filename: String,
+    query: &str,
+    ratio: f64,
+    exact: bool,
+) -> (
+    std::collections::HashSet<std::string::String>,
+    std::collections::HashSet<std::string::String>,
+) {
+    let mut class_set = HashSet::new();
+    let mut ratio_set = HashSet::new();
+    //let f = File::open(filename).expect("classification file not found");
+    let (f, _compression) = niffler::from_path(filename).expect("classification file not found");
+    for line in io::BufReader::new(f).lines() {
+        let l = line.unwrap();
+        let v: Vec<&str> = l.split('\t').collect();
+        let h: Vec<&str> = v[0].split(' ').collect();
+        if (v[2].parse::<f64>().unwrap() / v[3].parse::<f64>().unwrap()) >= ratio {
+            ratio_set.insert(String::from(h[0]));
+        }
+        if exact == true {
+            if v[1] == query {
+                class_set.insert(String::from(h[0]));
+            }
+        } else {
+            if v[1].contains(query)
+            /* && (v[4] == accept)*/
+            {
+                class_set.insert(String::from(h[0]));
+            }
+        }
+    }
+    (class_set, ratio_set)
+}
+
 pub fn fastq_or_fasta(file_name: &str) -> String {
     let (d, _format) = niffler::from_path(file_name).expect("nibbler choked");
     let mut first_line = String::new();
@@ -232,14 +267,18 @@ pub fn read_filter_se(
 //needletail version
 #[allow(unused_assignments)]
 pub fn read_filter_se_nt(
-    class_map: std::collections::HashMap<std::string::String, String>,
-    ratio_map: std::collections::HashMap<std::string::String, String>,
+    class_set: std::collections::HashSet<std::string::String>,
+    ratio_set: std::collections::HashSet<std::string::String>,
     filenames: Vec<&str>,
     query: &str,
     prefix: &str,
     exclude: bool,
 ) {
-    if class_map.is_empty() && ratio_map.is_empty() && exclude == false{
+    let mut intersection_size: usize = 0;
+    for _e in class_set.intersection(&ratio_set){
+        intersection_size += 1;
+    }
+    if (class_set.is_empty() && ratio_set.is_empty() && !exclude) || (!class_set.is_empty() && !ratio_set.is_empty() && intersection_size == 0){
         println!("No read-pairs matching the inclusion criteria for {}, exiting with 0 now.", filenames[0]);
         std::process::exit(0x0100);
 
@@ -265,8 +304,8 @@ pub fn read_filter_se_nt(
             .collect();
         //let v: Vec<&str> = seqrec1.id().split(' ').collect();
         if exclude == true {
-            if (!class_map.contains_key(v[0]) && ratio_map.is_empty())
-                || !(class_map.contains_key(v[0]) && ratio_map.contains_key(v[0]))
+            if (!class_set.contains(v[0]) && ratio_set.is_empty())
+                || !(class_set.contains(v[0]) && ratio_set.contains(v[0]))
             {
                 match seqrec1.format() {
                     needletail::parser::Format::Fasta => gz1
@@ -298,9 +337,9 @@ pub fn read_filter_se_nt(
                 excluded += 1;
             }
         } else {
-            if (class_map.contains_key(v[0]) && ratio_map.is_empty())
-                || (class_map.is_empty() && ratio_map.contains_key(v[0]))
-                || (class_map.contains_key(v[0]) && ratio_map.contains_key(v[0]))
+            if (class_set.contains(v[0]) && ratio_set.is_empty())
+                || (class_set.is_empty() && ratio_set.contains(v[0]))
+                || (class_set.contains(v[0]) && ratio_set.contains(v[0]))
             {
                 match seqrec1.format() {
                     needletail::parser::Format::Fasta => gz1
@@ -348,16 +387,21 @@ pub fn read_filter_se_nt(
 }
 
 pub fn read_filter_pe_nt(
-    class_map: std::collections::HashMap<std::string::String, String>,
-    ratio_map: std::collections::HashMap<std::string::String, String>,
+    class_set: std::collections::HashSet<std::string::String>,
+    ratio_set: std::collections::HashSet<std::string::String>,
     filenames: Vec<&str>,
     query: &str,
     prefix: &str,
     exclude: bool,
 ) {
     //if none of the inclusion criteria are met, print there is nothing to include and exit with 0
-    if class_map.is_empty() && ratio_map.is_empty() && exclude == false{
-        println!("No read-pairs matching the inclusion criteria for {} and {}, exiting with 0 now.", filenames[0], filenames[1]);
+    //this does not work if a minimum kmer-ratio is needed
+    let mut intersection_size: usize = 0;
+    for _e in class_set.intersection(&ratio_set){
+        intersection_size += 1;
+    }
+    if (class_set.is_empty() && ratio_set.is_empty() && !exclude) || (!class_set.is_empty() && !ratio_set.is_empty() && intersection_size == 0){
+        println!("No read-pairs matching the inclusion criteria for {}, exiting with 0 now.", filenames[0]);
         std::process::exit(0x0100);
 
     }
@@ -400,8 +444,8 @@ pub fn read_filter_pe_nt(
                 .split(' ')
                 .collect();
             if exclude == true {
-                if (!class_map.contains_key(v[0]) && ratio_map.is_empty())
-                    || !(class_map.contains_key(v[0]) && ratio_map.contains_key(v[0]))
+                if (!class_set.contains(v[0]) && ratio_set.is_empty())
+                    || !(class_set.contains(v[0]) && ratio_set.contains(v[0]))
                 {
                     match seqrec1.format() {
                         needletail::parser::Format::Fasta => {
@@ -455,9 +499,9 @@ pub fn read_filter_pe_nt(
                     excluded += 1;
                 }
             } else {
-                if (class_map.contains_key(v[0]) && ratio_map.is_empty())
-                    || (class_map.is_empty() && ratio_map.contains_key(v[0]))
-                    || (class_map.contains_key(v[0]) && ratio_map.contains_key(v[0]))
+                if (class_set.contains(v[0]) && ratio_set.is_empty())
+                    || (class_set.is_empty() && ratio_set.contains(v[0]))
+                    || (class_set.contains(v[0]) && ratio_set.contains(v[0]))
                 {
                     match seqrec1.format() {
                         needletail::parser::Format::Fasta => {

@@ -767,11 +767,11 @@ fn main() {
             let taxon_cleaned = taxon.replace(" ", "_");
             format!("{}_{}", default, taxon_cleaned)
         };
-        let map = read_filter::tab_to_map(classification.to_string(), taxon, ratio, exact);
+        let sets = read_filter::tab_to_set(classification.to_string(), taxon, ratio, exact);
         if files.len() == 1 {
-            read_filter::read_filter_se_nt(map.0, map.1, files, taxon, &prefix, exclude);
+            read_filter::read_filter_se_nt(sets.0, sets.1, files, taxon, &prefix, exclude);
         } else {
-            read_filter::read_filter_pe_nt(map.0, map.1, files, taxon, &prefix, exclude);
+            read_filter::read_filter_pe_nt(sets.0, sets.1, files, taxon, &prefix, exclude);
         }
     }
 }
