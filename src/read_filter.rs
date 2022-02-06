@@ -278,7 +278,7 @@ pub fn read_filter_se_nt(
     for _e in class_set.intersection(&ratio_set){
         intersection_size += 1;
     }
-    if (class_set.is_empty() && ratio_set.is_empty() && !exclude) || (!class_set.is_empty() && !ratio_set.is_empty() && intersection_size == 0){
+    if (class_set.is_empty() && ratio_set.is_empty() && !exclude) || (!class_set.is_empty() && !ratio_set.is_empty() && intersection_size == 0 && !exclude){
         println!("No read-pairs matching the inclusion criteria for {}, exiting with 0 now.", filenames[0]);
         std::process::exit(0x0100);
 
@@ -400,7 +400,7 @@ pub fn read_filter_pe_nt(
     for _e in class_set.intersection(&ratio_set){
         intersection_size += 1;
     }
-    if (class_set.is_empty() && ratio_set.is_empty() && !exclude) || (!class_set.is_empty() && !ratio_set.is_empty() && intersection_size == 0){
+    if (class_set.is_empty() && ratio_set.is_empty() && !exclude) || (!class_set.is_empty() && !ratio_set.is_empty() && intersection_size == 0 && !exclude){
         println!("No read-pairs matching the inclusion criteria for {}, exiting with 0 now.", filenames[0]);
         std::process::exit(0x0100);
 
