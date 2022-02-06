@@ -5,6 +5,7 @@ use fs_extra::dir::get_size;
 use hashbrown::HashMap;
 use rayon::ThreadPoolBuilder;
 use sepia::direct_read_write;
+use sepia::read_filter;
 use sepia::seq;
 use std::alloc::System;
 use std::collections::HashSet;
@@ -24,14 +25,14 @@ static GLOBAL: System = System;
 
 fn main() {
     let matches = App::new("sepia")
-            .version("1.0.0")
+            .version("1.1.0")
             .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
             .about("a taxonomy centered read classifier and more")
             .setting(AppSettings::ArgRequiredElseHelp)
             .subcommand(
                 SubCommand::with_name("build")
                     .about("builds an index")
-                    .version("1.0")
+                    .version("1.1")
                     .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
                     .setting(AppSettings::ArgRequiredElseHelp)
                     .arg(
@@ -246,6 +247,78 @@ fn main() {
                             .default_value("true")
                             .long("compress_output"),
                     ),
+        )
+        .subcommand(
+        SubCommand::with_name("read_filter")
+        .version("0.1.0")
+        .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
+        .about("read filter for sepia output original fasta/fastq data")
+        .setting(AppSettings::ArgRequiredElseHelp)
+                .arg(
+                    Arg::with_name("classification")
+                        .short("c")
+                        .long("classification")
+                        .required(true)
+                        .takes_value(true)
+                        .help("tab delimited read classification file generated with the classify or batch_classify subcommand"),
+                        )
+                .arg(
+                    Arg::with_name("files")
+                        .help("query file(-s)fastq or fasta, compression agnostic")
+                        .required(true)
+                        .min_values(1)
+                        .short("f")
+                        .takes_value(true)
+                        .long("files"),
+                )
+                .arg(
+                    Arg::with_name("taxon")
+                        .help("taxon to be in- or excluded from the read file(-s)")
+                        .required(false)
+                        .short("t")
+                        .takes_value(true)
+                        .long("taxon"),
+                        )
+                .arg(
+                    Arg::with_name("ratio")
+                        .help("hit to no-hits ratio for read(-pair) to be included in the read file(-s)")
+                        .required(false)
+                        .short("r")
+                        .takes_value(true)
+                        .long("ratio"),
+                        )
+                .arg(
+                    Arg::with_name("prefix")
+                        .help("prefix for output file(-s)")
+                        .required(false)
+                        .short("p")
+                        .takes_value(true)
+                        .long("prefix"),
+                        )
+                .arg(
+                    Arg::with_name("exclude")
+                        .help("If set('-e or --exclude'), reads for which the classification contains the taxon name will be excluded")
+                        .required(false)
+                        .short("e")
+                        .takes_value(false)
+                        .long("exclude"),
+                )
+                .arg(
+                    Arg::with_name("exact")
+                        .help("If set to 'true' the exact classifier line is used")
+                        .required(false)
+                        .short("z")
+                        .takes_value(false)
+                        .long("exact"),
+                )
+               .arg(
+                    Arg::with_name("output_prefix")
+                        .help("prefix to be used for output, if omitted, prefix will be 'prefix_taxon'")
+                        .required(false)
+                        .short("o")
+                        .takes_value(true)
+                        .long("output_prefix"),
+                        ),
         ).get_matches();
 
     if let Some(matches) = matches.subcommand_matches("build") {
@@ -668,6 +741,37 @@ fn main() {
                 tag,
                 gzip_output,
             );
+        }
+    }
+    if let Some(matches) = matches.subcommand_matches("read_filter") {
+        let classification = matches.value_of("classification").unwrap();
+        let files: Vec<_> = matches.values_of("files").unwrap().collect();
+        let taxon = matches.value_of("taxon").unwrap_or("nonsense");
+        let ratio = value_t!(matches, "ratio", f64).unwrap_or(0.0);
+        //let prefix = matches.value_of("prefix").unwrap();
+        let exclude = matches.is_present("exclude");
+        let exact = matches.is_present("exact");
+        let custom_prefix = matches.is_present("output_prefix");
+        if (matches.is_present("prefix") == false) && (matches.is_present("output_prefix") == false)
+        {
+            println!("Either a prefix or complete filename (minus the extension) for the output file has to be provided!");
+            process::abort();
+        }
+        let prefix = if custom_prefix {
+            matches.value_of("output_prefix").unwrap().to_string()
+        } else if taxon == "nonsense" {
+            let default = matches.value_of("prefix").unwrap();
+            format!("{}_ratio_{}", default, ratio)
+        } else {
+            let default = matches.value_of("prefix").unwrap();
+            let taxon_cleaned = taxon.replace(" ", "_");
+            format!("{}_{}", default, taxon_cleaned)
+        };
+        let map = read_filter::tab_to_map(classification.to_string(), taxon, ratio, exact);
+        if files.len() == 1 {
+            read_filter::read_filter_se_nt(map.0, map.1, files, taxon, &prefix, exclude);
+        } else {
+            read_filter::read_filter_pe_nt(map.0, map.1, files, taxon, &prefix, exclude);
         }
     }
 }
