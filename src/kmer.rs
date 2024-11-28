@@ -366,13 +366,27 @@ pub fn sliding_window_numerical_zeroth(
 #[inline]
 pub fn sliding_window_zeroth_nt(v: &String, k: usize, m: usize) -> std::collections::HashSet<u64> {
     let mut mset = std::collections::HashSet::default();
-    let mut reader1 = parse_fastx_file(v).expect("invalid path/file");
+    let mut reader1 = match parse_fastx_file(v) {
+        Ok(reader) => reader,
+        Err(e) => {
+            eprintln!("Error reading file {}: {}" , v, e);
+            return mset;  // Return empty set on error
+        }
+    };
+
     while let Some(record1) = reader1.next() {
-        let seqrec1 = record1.expect("invalid record in forward file");
+        let seqrec1 = match record1 {
+            Ok(rec) => rec,
+            Err(e) => {
+                eprintln!("Invalid record: {}", e);
+                continue;  // Skip invalid records
+            }
+        };
+
         if seqrec1.seq().len() < k {
             continue;
         } else {
-            let seq = &std::str::from_utf8(&seqrec1.seq())
+			let seq = &std::str::from_utf8(&seqrec1.seq())
                 .unwrap()
                 .to_string()
                 .to_uppercase();
