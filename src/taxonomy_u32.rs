@@ -72,7 +72,7 @@ pub fn get_lineage_graph(query: u32, graph: &HashMap<u32, u32>) -> Vec<u32> {
     let mut lineage = vec![query];
     while !stop {
         let value = graph.get(&lineage[lineage.len() - 1]);
-        if value == None {
+        if value.is_none() {
             stop = true;
         } else {
             lineage.push(*value.unwrap());

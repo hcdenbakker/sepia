@@ -23,303 +23,232 @@ extern crate clap;
 #[global_allocator]
 static GLOBAL: System = System;
 
-fn main() {
-    let matches = App::new("sepia")
-            .version("1.1.0")
-            .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
-            .about("a taxonomy centered read classifier and more")
-            .setting(AppSettings::ArgRequiredElseHelp)
-            .subcommand(
-                SubCommand::with_name("build")
-                    .about("builds an index")
-                    .version("1.1")
-                    .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
-                    .setting(AppSettings::ArgRequiredElseHelp)
-                    .arg(
-                        Arg::with_name("index")
-                            .help("Output directory for the index")
-                            .short("i")
-                            .long("index")
-                            .required(true)
-                            .takes_value(true),
-                    )
-                    .arg(
-                        Arg::with_name("ref_file")
-                            .help("Sets the reference file to use; this is a tab delimited file with two columns; the first column contains the path to the file, the second the associated lineage (see ref_demo.txt)")
-                            .required(true)
-                            .short("r")
-                            .takes_value(true)
-                            .long("refs"),
-                    )
-                    .arg(
-                        Arg::with_name("k-mer_size")
-                            .help("Sets k-mer size")
-                            .required(true)
-                            .short("k")
-                            .takes_value(true)
-                            .long("kmer"),
-                    )
-                    .arg(
-                        Arg::with_name("batch")
-                            .help("Sets size of batch of reads to be processed in parallel (default 300)")
-                            .required(false)
-                            .short("c")
-                            .takes_value(true)
-                            .long("batch"),
-                    )
-                    .arg(
-                        Arg::with_name("minimizer")
-                            .help("minimizer size, default length minimizer is 0 (no minimizers), unless indicated otherwise")
-                            .required(true)
-                            .short("m")
-                            .default_value("0")
-                            .takes_value(true)
-                            .long("minimizer"),
-                    )
-                    .arg(
-                        Arg::with_name("threads")
-                            .help("number of threads to use, if not set one thread will be used")
-                            .required(false)
-                            .short("p")
-                            .takes_value(true)
-                            .long("threads"),
-                    )
-                    .arg(
-                        Arg::with_name("gamma")
-                            .help("gamma parameter used for perfect hash function in boom mode, default value 5.0")
-                            .required(false)
-                            .short("g")
-                            .takes_value(true)
-                            .long("gamma"),
-                    )
-                    .arg(
-                        Arg::with_name("mode")
-                            .help("build kraken2-like db (sepia), or a index with a perfect hash function (boom)")
-                            .required(false)
-                            .short("M")
-                            .default_value("sepia")
-                            .takes_value(true)
-                            .long("mode"),
-                    ),
-            )
-            .subcommand(
-                SubCommand::with_name("classify")
-                    .about("classifies reads using an lca approach")
-                    .version("1.0")
-                    .author("Henk den Bakker. <henkcdenbakker@gmail.com>")
-                    .setting(AppSettings::ArgRequiredElseHelp)
-                    .arg(
-                        Arg::with_name("index")
-                            .short("i")
-                            .long("index")
-                            .required(true)
-                            .takes_value(true)
-                            .help("index to be used for search"),
-                            )
-                    .arg(
-                        Arg::with_name("query")
-                            .help("query file(-s)fastq.gz")
-                            .required(true)
-                            .min_values(1)
-                            .short("q")
-                            .takes_value(true)
-                            .long("query"),
-                    )
-                    .arg(
-                        Arg::with_name("interleaved")
-                            .help("Type of sequence data; pe: paired-end fastq.gz, se: single-end fastq.gz, inter: interleaved paired-end fastq.gz, fasta: reads in fasta format")
-                            .required(false)
-                            .short("I")
-                            .long("interleaved"),
-                    )
-                    .arg(
-                        Arg::with_name("batch")
-                            .help("Sets size of batch of reads to be processed in parallel (default 50,000)")
-                            .required(false)
-                            .short("c")
-                            .takes_value(true)
-                            .long("batch"),
-                    )
-                    .arg(
-                        Arg::with_name("threads")
-                            .help("number of threads to use, if not set the maximum available number threads will be used")
-                            .required(false)
-                            .short("t")
-                            .takes_value(true)
-                            .long("threads"),
-                    )
-                    .arg(
-                        Arg::with_name("prefix")
-                            .help("prefix for output file(-s)")
-                            .required(true)
-                            .short("n") //running out of options here!
-                            .takes_value(true)
-                            .long("prefix"),
-                    )
-                    .arg(
-                        Arg::with_name("quality")
-                            .help("kmers with nucleotides below this minimum phred score will be excluded from the analyses (default 15)")
-                            .required(false)
-                            .short("Q")
-                            .takes_value(true)
-                            .long("quality"),
-                    )
-                    .arg(
-                        Arg::with_name("hll")
-                            .help("include HLL based estimates of cardinilaty of kmers and duplicity of kmers")
-                            //.required(false)
-                            .short("H")
-                            .takes_value(false)
-                            //.default_value("false")
-                            .long("hll"),
-                    )
-                    .arg(
-                        Arg::with_name("compress_output")
-                            .help("gzip compress read classification file")
-                            .required(false)
-                            .short("z")
-                            .takes_value(true)
-                            .default_value("true")
-                            .long("compress_output"),
-                    ),
-            )
-            .subcommand(
-            SubCommand::with_name("batch_classify")
-                .about("classifies batch of samples reads")
-                .version("1.0")
-                .author("Henk den Bakker. <henkcdenbakker@gmail.com>")
+fn build_cli() -> App<'static, 'static> {
+    App::new("sepia")
+        .version("1.1.0")
+        .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
+        .about("a taxonomy centered read classifier and more")
+        .setting(AppSettings::ArgRequiredElseHelp)
+        .subcommand(
+            SubCommand::with_name("build")
+                .about("builds an index")
+                .version("1.1")
+                .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
                 .setting(AppSettings::ArgRequiredElseHelp)
                 .arg(
                     Arg::with_name("index")
+                        .help("Output directory for the index")
                         .short("i")
                         .long("index")
                         .required(true)
-                        .takes_value(true)
-                        .help("index to be used for search"),
-                        )
-                .arg(
-                    Arg::with_name("query")
-                        .help("tab-delimited file with samples to be classified [sample_name reads1 reads2 (optional)]")
-                        .required(true)
-                        .min_values(1)
-                        .short("q")
-                        .takes_value(true)
-                        .long("query"),
+                        .takes_value(true),
                 )
                 .arg(
-                    Arg::with_name("tag")
-                        .help("tag to be include in output file names ")
+                    Arg::with_name("ref_file")
+                        .help("Sets the reference file to use; this is a tab delimited file with two columns; the first column contains the path to the file, the second the associated lineage (see ref_demo.txt)")
                         .required(true)
-                        .short("T") //
+                        .short("r")
                         .takes_value(true)
-                        .long("tag"),
+                        .long("refs"),
+                )
+                .arg(
+                    Arg::with_name("k-mer_size")
+                        .help("Sets k-mer size")
+                        .required(true)
+                        .short("k")
+                        .takes_value(true)
+                        .long("kmer"),
                 )
                 .arg(
                     Arg::with_name("batch")
-                        .help("Sets size of batch of reads to be processed in parallel (default 50,000)")
+                        .help("Sets size of batch of reads to be processed in parallel (default 300)")
                         .required(false)
                         .short("c")
                         .takes_value(true)
                         .long("batch"),
                 )
                 .arg(
+                    Arg::with_name("minimizer")
+                        .help("minimizer size, default length minimizer is 0 (no minimizers), unless indicated otherwise")
+                        .required(true)
+                        .short("m")
+                        .default_value("0")
+                        .takes_value(true)
+                        .long("minimizer"),
+                )
+                .arg(
                     Arg::with_name("threads")
-                        .help("number of threads to use, if not set the maximum available number threads will be used")
+                        .help("number of threads to use, if not set one thread will be used")
                         .required(false)
-                        .short("t")
+                        .short("p")
+                        .takes_value(true)
+                        .long("threads"),
+                )
+                .arg(
+                    Arg::with_name("gamma")
+                        .help("gamma parameter used for perfect hash function in boom mode, default value 5.0")
+                        .required(false)
+                        .short("g")
+                        .takes_value(true)
+                        .long("gamma"),
+                )
+                .arg(
+                    Arg::with_name("mode")
+                        .help("build kraken2-like db (sepia), or a index with a perfect hash function (boom)")
+                        .required(false)
+                        .short("M")
+                        .default_value("sepia")
+                        .takes_value(true)
+                        .long("mode"),
+                )
+                .arg(
+                    Arg::with_name("value_bits")
+                        .help("number of bits to store the taxon id, default 5 bits (32 taxa)")
+                        .required(false)
+                        .short("b")
+                        .default_value("5")
+                        .takes_value(true)
+                        .long("bits"),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("classify")
+                .about("classifies reads")
+                .version("1.1")
+                .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
+                .setting(AppSettings::ArgRequiredElseHelp)
+                .arg(
+                    Arg::with_name("index")
+                        .help("index directory")
+                        .short("i")
+                        .long("index")
+                        .required(true)
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("query")
+                        .help("fastq file(s) to classify")
+                        .required(true)
+                        .multiple(true)
+                        .short("q")
+                        .takes_value(true)
+                        .long("query"),
+                )
+                .arg(
+                    Arg::with_name("threads")
+                        .help("number of threads to use")
+                        .required(false)
+                        .short("p")
                         .takes_value(true)
                         .long("threads"),
                 )
                 .arg(
                     Arg::with_name("quality")
-                        .help("kmers with nucleotides below this minimum phred score will be excluded from the analyses (default 15)")
+                        .help("quality threshold for masking low quality bases")
                         .required(false)
                         .short("Q")
+                        .default_value("15")
                         .takes_value(true)
                         .long("quality"),
-                        )
-                .arg(
-                        Arg::with_name("compress_output")
-                            .help("gzip compress read classification file")
-                            .required(false)
-                            .short("z")
-                            .takes_value(true)
-                            .default_value("true")
-                            .long("compress_output"),
-                    ),
-        )
-        .subcommand(
-        SubCommand::with_name("read_filter")
-        .version("0.1.0")
-        .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
-        .about("read filter for sepia output original fasta/fastq data")
-        .setting(AppSettings::ArgRequiredElseHelp)
-                .arg(
-                    Arg::with_name("classification")
-                        .short("c")
-                        .long("classification")
-                        .required(true)
-                        .takes_value(true)
-                        .help("tab delimited read classification file generated with the classify or batch_classify subcommand"),
-                        )
-                .arg(
-                    Arg::with_name("files")
-                        .help("query file(-s)fastq or fasta, compression agnostic")
-                        .required(true)
-                        .min_values(1)
-                        .short("f")
-                        .takes_value(true)
-                        .long("files"),
                 )
                 .arg(
-                    Arg::with_name("taxon")
-                        .help("taxon to be in- or excluded from the read file(-s)")
+                    Arg::with_name("batch")
+                        .help("batch size for parallel processing")
                         .required(false)
-                        .short("t")
+                        .short("b")
+                        .default_value("50000")
                         .takes_value(true)
-                        .long("taxon"),
-                        )
-                .arg(
-                    Arg::with_name("ratio")
-                        .help("hit to no-hits ratio for read(-pair) to be included in the read file(-s)")
-                        .required(false)
-                        .short("r")
-                        .takes_value(true)
-                        .long("ratio"),
-                        )
+                        .long("batch"),
+                )
                 .arg(
                     Arg::with_name("prefix")
-                        .help("prefix for output file(-s)")
-                        .required(false)
-                        .short("p")
-                        .takes_value(true)
-                        .long("prefix"),
-                        )
-                .arg(
-                    Arg::with_name("exclude")
-                        .help("If set('-e or --exclude'), reads for which the classification contains the taxon name will be excluded")
-                        .required(false)
-                        .short("e")
-                        .takes_value(false)
-                        .long("exclude"),
-                )
-                .arg(
-                    Arg::with_name("exact")
-                        .help("If set to 'true' the exact classifier line is used")
-                        .required(false)
-                        .short("z")
-                        .takes_value(false)
-                        .long("exact"),
-                )
-               .arg(
-                    Arg::with_name("output_prefix")
-                        .help("prefix to be used for output, if omitted, prefix will be 'prefix_taxon'")
-                        .required(false)
+                        .help("output prefix")
+                        .required(true)
                         .short("o")
                         .takes_value(true)
                         .long("output_prefix"),
-                        ),
-        ).get_matches();
+                )
+                .arg(
+                    Arg::with_name("compress_output")
+                        .help("compress output files")
+                        .required(false)
+                        .short("z")
+                        .default_value("true")
+                        .takes_value(true)
+                        .long("compress"),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("batch_classify")
+                .about("classifies multiple samples in batch")
+                .version("1.1")
+                .author("Henk C. den Bakker <henkcdenbakker@gmail.com>")
+                .setting(AppSettings::ArgRequiredElseHelp)
+                .arg(
+                    Arg::with_name("index")
+                        .help("index directory")
+                        .short("i")
+                        .long("index")
+                        .required(true)
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("query")
+                        .help("tab delimited file with sample names and fastq files")
+                        .required(true)
+                        .short("q")
+                        .takes_value(true)
+                        .long("query"),
+                )
+                .arg(
+                    Arg::with_name("threads")
+                        .help("number of threads to use")
+                        .required(false)
+                        .short("p")
+                        .takes_value(true)
+                        .long("threads"),
+                )
+                .arg(
+                    Arg::with_name("quality")
+                        .help("quality threshold for masking low quality bases")
+                        .required(false)
+                        .short("Q")
+                        .default_value("15")
+                        .takes_value(true)
+                        .long("quality"),
+                )
+                .arg(
+                    Arg::with_name("batch")
+                        .help("batch size for parallel processing")
+                        .required(false)
+                        .short("b")
+                        .default_value("50000")
+                        .takes_value(true)
+                        .long("batch"),
+                )
+                .arg(
+                    Arg::with_name("tag")
+                        .help("tag for output files")
+                        .required(true)
+                        .short("t")
+                        .takes_value(true)
+                        .long("tag"),
+                )
+                .arg(
+                    Arg::with_name("compress_output")
+                        .help("compress output files")
+                        .required(false)
+                        .short("z")
+                        .default_value("true")
+                        .takes_value(true)
+                        .long("compress"),
+                ),
+        )
+}
+
+fn main() {
+    let matches = build_cli().get_matches();
+
 
     if let Some(matches) = matches.subcommand_matches("build") {
         println!("Ref_file : {}", matches.value_of("ref_file").unwrap());
@@ -479,12 +408,12 @@ fn main() {
             formats.insert(seq::fastq_or_fasta(f));
         }
         if formats.len() > 1
-            || (formats.get(&"unknown".to_string()) == Some(&"unknown".to_string()))
+            || (formats.contains("unknown"))
         {
             eprintln!("sequence format not recognized or mixed fasta and fastq data");
             process::abort();
         }
-        if (fq.len() > 1 || (formats.get(&"fasta".to_string()) == Some(&"fasta".to_string())))
+        if (fq.len() > 1 || (formats.contains("fasta")))
             && interleaved
         {
             eprintln!("Interleaved flag does not work with multiple files or fasta-format");
@@ -524,11 +453,11 @@ fn main() {
                     eprintln!("Error: {:?}", e);
                 }
             }
-            if fq.len() == 2 && (formats.get(&"fastq".to_string()) == Some(&"fastq".to_string())) {
+            if fq.len() == 2 && (formats.contains("fastq")) {
                 eprintln!("Paired-end fastq data assumed");
                 sepia::search_bits::per_read_stream_pe(
                     &fq,
-                    &db,
+                    db,
                     &phf,
                     &parameters,
                     batch,
@@ -537,12 +466,12 @@ fn main() {
                     gzip_output,
                 )
             };
-            if fq.len() == 1 && (formats.get(&"fastq".to_string()) == Some(&"fastq".to_string())) {
+            if fq.len() == 1 && (formats.contains("fastq")) {
                 if interleaved {
                     eprintln!("Paired-end interleaved fastq data assumed");
                     sepia::search_bits::per_read_stream_pe_one_file(
                         &fq,
-                        &db,
+                        db,
                         &colors,
                         &phf,
                         &parameters.lineage_graph,
@@ -558,7 +487,7 @@ fn main() {
                     eprintln!("Single-end fastq data assumed");
                     sepia::search_bits::per_read_stream_se(
                         &fq,
-                        &db,
+                        db,
                         &colors,
                         &phf,
                         &parameters.lineage_graph,
@@ -572,11 +501,11 @@ fn main() {
                     )
                 }
             };
-            if formats.get(&"fasta".to_string()) == Some(&"fasta".to_string()) {
+            if formats.contains("fasta") {
                 eprintln!("Single-end fasta data assumed");
                 sepia::search_bits::per_read_stream_se(
                     &fq,
-                    &db,
+                    db,
                     &colors,
                     &phf,
                     &parameters.lineage_graph,
@@ -602,11 +531,11 @@ fn main() {
                     eprintln!("Error: {:?}", e);
                 }
             }
-            if fq.len() == 2 && (formats.get(&"fastq".to_string()) == Some(&"fastq".to_string())) {
+            if fq.len() == 2 && (formats.contains("fastq")) {
                 eprintln!("Paired-end fastq data assumed");
                 sepia::search_bits_sepia::per_read_stream_pe(
                     &fq,
-                    &db,
+                    db,
                     &parameters,
                     batch,
                     prefix,
@@ -615,12 +544,12 @@ fn main() {
                     gzip_output,
                 )
             };
-            if fq.len() == 1 && (formats.get(&"fastq".to_string()) == Some(&"fastq".to_string())) {
+            if fq.len() == 1 && (formats.contains("fastq")) {
                 if interleaved {
                     eprintln!("Paired-end interleaved fastq data assumed");
                     sepia::search_bits_sepia::per_read_stream_pe_one_file(
                         &fq,
-                        &db,
+                        db,
                         &parameters,
                         batch,
                         prefix,
@@ -631,7 +560,7 @@ fn main() {
                     eprintln!("Single-end fastq data assumed");
                     sepia::search_bits_sepia::per_read_stream_se(
                         &fq,
-                        &db,
+                        db,
                         &parameters,
                         batch,
                         prefix,
@@ -641,11 +570,11 @@ fn main() {
                     )
                 }
             };
-            if formats.get(&"fasta".to_string()) == Some(&"fasta".to_string()) {
+            if formats.contains("fasta") {
                 eprintln!("Single-end fasta data assumed");
                 sepia::search_bits_sepia::per_read_stream_se(
                     &fq,
-                    &db,
+                    db,
                     &parameters,
                     batch,
                     prefix,
@@ -710,7 +639,7 @@ fn main() {
 
             sepia::classify_batch::batch_classify(
                 batch_samples,
-                &db,
+                db,
                 &phf,
                 &parameters,
                 batch, //batch size for multi-threading
@@ -736,7 +665,7 @@ fn main() {
 
             sepia::classify_batch_sepia::batch_classify(
                 batch_samples,
-                &db,
+                db,
                 &parameters,
                 batch, //batch size for multi-threading
                 quality,
@@ -754,7 +683,7 @@ fn main() {
         let exclude = matches.is_present("exclude");
         let exact = matches.is_present("exact");
         let custom_prefix = matches.is_present("output_prefix");
-        if (matches.is_present("prefix") == false) && (matches.is_present("output_prefix") == false)
+        if (!matches.is_present("prefix")) && (!matches.is_present("output_prefix"))
         {
             println!("Either a prefix or complete filename (minus the extension) for the output file has to be provided!");
             process::abort();

@@ -22,7 +22,7 @@ pub fn zeroth(entries: &[Vec<String>], k: usize, m: usize, c: usize) -> usize {
                         mini_set.insert(hash);
                     }
                 } else {*/
-                let mmers = kmer::sliding_window_zeroth_nt(&r, k, m);
+                let mmers = kmer::sliding_window_zeroth_nt(r, k, m);
                 let mut mini_set = mini_set.lock().unwrap();
                 for hash in mmers {
                     mini_set.insert(hash);
@@ -52,7 +52,7 @@ pub fn zeroth(entries: &[Vec<String>], k: usize, m: usize, c: usize) -> usize {
                 mini_set.insert(hash);
             }
         } else {*/
-        let mmers = kmer::sliding_window_zeroth_nt(&r, k, m);
+        let mmers = kmer::sliding_window_zeroth_nt(r, k, m);
         let mut mini_set = mini_set.lock().unwrap();
         for hash in mmers {
             mini_set.insert(hash);

@@ -306,7 +306,7 @@ pub fn hash_fingerprints(
         let idx = phf.try_hash(&h).unwrap() as usize;
         finger_prints[idx] = bit_magic::populate(h, 0_u32, value_bits);
         finger_counter += 1;
-        if finger_counter % 1000 == 0 {
+        if finger_counter.is_multiple_of(1000) {
             eprint!(
                 "processed {}/{} accessions\r",
                 finger_counter, hash_vector_length
@@ -607,7 +607,7 @@ pub fn build_db_bits_parallel_sepia(
     }
     println!("Estimated number of minimizers: {}\nInitial size of compact hash set set to {}\nBuidling index...", accessions_estimate, vector_size);
     //let (phf, mut db) = hash_fingerprints(accessions, k_size, m_size, batch, value_bits);
-    let mut db: Vec<u32> = vec![0; vector_size as usize];
+    let mut db: Vec<u32> = vec![0; vector_size];
     let map_length = accessions.len();
     let mut processed = 0;
     eprintln!("Creating final index...");

@@ -31,16 +31,14 @@ pub fn tab_to_map(
         if (v[2].parse::<f64>().unwrap() / v[3].parse::<f64>().unwrap()) >= ratio {
             ratio_map.insert(String::from(h[0]), String::from(v[1]));
         }
-        if exact == true {
+        if exact {
             if v[1] == query {
                 class_map.insert(String::from(h[0]), String::from(v[1]));
             }
-        } else {
-            if v[1].contains(query)
+        } else if v[1].contains(query)
             /* && (v[4] == accept)*/
-            {
-                class_map.insert(String::from(h[0]), String::from(v[1]));
-            }
+        {
+            class_map.insert(String::from(h[0]), String::from(v[1]));
         }
     }
     (class_map, ratio_map)
@@ -66,16 +64,14 @@ pub fn tab_to_set(
         if (v[2].parse::<f64>().unwrap() / v[3].parse::<f64>().unwrap()) >= ratio {
             ratio_set.insert(String::from(h[0]));
         }
-        if exact == true {
+        if exact {
             if v[1] == query {
                 class_set.insert(String::from(h[0]));
             }
-        } else {
-            if v[1].contains(query)
+        } else if v[1].contains(query)
             /* && (v[4] == accept)*/
-            {
-                class_set.insert(String::from(h[0]));
-            }
+        {
+            class_set.insert(String::from(h[0]));
         }
     }
     (class_set, ratio_set)
@@ -107,8 +103,8 @@ pub fn read_filter_pe(
     exclude: bool,
 ) {
     let mut line_count = 1;
-    let f = File::open(&filenames[0]).expect("file not found");
-    let f2 = File::open(&filenames[1]).expect("file not found");
+    let f = File::open(filenames[0]).expect("file not found");
+    let f2 = File::open(filenames[1]).expect("file not found");
     let d1 = MultiGzDecoder::new(f);
     let d2 = MultiGzDecoder::new(f2);
     let iter1 = io::BufReader::new(d1).lines();
@@ -151,7 +147,7 @@ pub fn read_filter_pe(
                     qual1 = l.to_owned();
                     qual2 = l2.unwrap().to_owned();
                     let v: Vec<&str> = header1.split(' ').collect();
-                    if exclude == true {
+                    if exclude {
                         if !class_map.contains_key(&v[0][1..]) {
                             gz1.write_all(
                                 format!("{}\n{}\n+\n{}\n", header1, seq1, qual1).as_bytes(),
@@ -188,7 +184,7 @@ pub fn read_filter_pe(
     }
     gz1.finish().expect("Could not close new R1 file");
     gz2.finish().expect("Could not close new R2 file");
-    if exclude == true {
+    if exclude {
         eprintln!(
             "Excluded {} read pairs  with classification containing '{}' from output files",
             excluded, query
@@ -212,7 +208,7 @@ pub fn read_filter_se(
     exclude: bool,
 ) {
     let mut line_count = 1;
-    let f = File::open(&filenames[0]).expect("file not found");
+    let f = File::open(filenames[0]).expect("file not found");
     let d1 = MultiGzDecoder::new(f);
     let iter1 = io::BufReader::new(d1).lines();
     let mut header1 = "".to_string();
@@ -231,7 +227,7 @@ pub fn read_filter_se(
         } else if line_count % 4 == 0 {
             qual1 = l.to_owned();
             let v: Vec<&str> = header1.split(' ').collect();
-            if exclude == true {
+            if exclude {
                 if !class_map.contains_key(&v[0][1..]) {
                     gz1.write_all(format!("{}\n{}\n+\n{}\n", header1, seq1, qual1).as_bytes())
                         .expect("Could not write forward read(-s) to file");
@@ -251,7 +247,7 @@ pub fn read_filter_se(
         line_count += 1;
     }
     gz1.finish().expect("Could not close new read file");
-    if exclude == true {
+    if exclude {
         eprintln!(
             "Excluded {} read pairs  with classification containing '{}' from output files",
             excluded, query
@@ -303,7 +299,7 @@ pub fn read_filter_se_nt(
             .split(' ')
             .collect();
         //let v: Vec<&str> = seqrec1.id().split(' ').collect();
-        if exclude == true {
+        if exclude {
             if (!class_set.contains(v[0]) && ratio_set.is_empty())
                 || !(class_set.contains(v[0]) && ratio_set.contains(v[0]))
             {
@@ -312,8 +308,8 @@ pub fn read_filter_se_nt(
                         .write_all(
                             format!(
                                 ">{}\n{}\n",
-                                std::str::from_utf8(&seqrec1.id()).unwrap().to_string(),
-                                std::str::from_utf8(&seqrec1.raw_seq()).unwrap().to_string()
+                                std::str::from_utf8(seqrec1.id()).unwrap(),
+                                std::str::from_utf8(seqrec1.raw_seq()).unwrap()
                             )
                             .as_bytes(),
                         )
@@ -323,11 +319,10 @@ pub fn read_filter_se_nt(
                         .write_all(
                             format!(
                                 "@{}\n{}\n+\n{}\n",
-                                std::str::from_utf8(&seqrec1.id()).unwrap().to_string(),
-                                std::str::from_utf8(&seqrec1.raw_seq()).unwrap().to_string(),
-                                std::str::from_utf8(&seqrec1.qual().unwrap())
+                                std::str::from_utf8(seqrec1.id()).unwrap(),
+                                std::str::from_utf8(seqrec1.raw_seq()).unwrap(),
+                                std::str::from_utf8(seqrec1.qual().unwrap())
                                     .unwrap()
-                                    .to_string()
                             )
                             .as_bytes(),
                         )
@@ -346,8 +341,8 @@ pub fn read_filter_se_nt(
                         .write_all(
                             format!(
                                 ">{}\n{}\n",
-                                std::str::from_utf8(&seqrec1.id()).unwrap().to_string(),
-                                std::str::from_utf8(&seqrec1.raw_seq()).unwrap().to_string()
+                                std::str::from_utf8(seqrec1.id()).unwrap(),
+                                std::str::from_utf8(seqrec1.raw_seq()).unwrap()
                             )
                             .as_bytes(),
                         )
@@ -357,11 +352,10 @@ pub fn read_filter_se_nt(
                         .write_all(
                             format!(
                                 "@{}\n{}\n+\n{}\n",
-                                std::str::from_utf8(&seqrec1.id()).unwrap().to_string(),
-                                std::str::from_utf8(&seqrec1.raw_seq()).unwrap().to_string(),
-                                std::str::from_utf8(&seqrec1.qual().unwrap())
+                                std::str::from_utf8(seqrec1.id()).unwrap(),
+                                std::str::from_utf8(seqrec1.raw_seq()).unwrap(),
+                                std::str::from_utf8(seqrec1.qual().unwrap())
                                     .unwrap()
-                                    .to_string()
                             )
                             .as_bytes(),
                         )
@@ -372,7 +366,7 @@ pub fn read_filter_se_nt(
         }
     }
     gz1.finish().expect("Could not close new read file");
-    if exclude == true {
+    if exclude {
         eprintln!(
             "Excluded {} read pairs  with classification containing '{}' from output files",
             total - excluded,
@@ -415,13 +409,13 @@ pub fn read_filter_pe_nt(
     for f in &filenames {
         formats.insert(fastq_or_fasta(f));
     }
-    if formats.len() > 1 || (formats.get(&"unknown".to_string()) == Some(&"unknown".to_string())) {
+    if formats.len() > 1 || formats.contains("unknown") {
         eprintln!("sequence format not recognized or mixed fasta and fastq data");
         process::abort();
     }
     println!("{} detected!", format);
-    let mut reader1 = parse_fastx_file(&filenames[0]).expect("invalid path/file");
-    let mut reader2 = parse_fastx_file(&filenames[1]).expect("invalid path/file");
+    let mut reader1 = parse_fastx_file(filenames[0]).expect("invalid path/file");
+    let mut reader2 = parse_fastx_file(filenames[1]).expect("invalid path/file");
     let fq1 = if format == "fastq" {
         File::create(format!("{}_R1.fq.gz", prefix)).expect("could not create R1 file!")
     } else {
@@ -443,7 +437,7 @@ pub fn read_filter_pe_nt(
                 .unwrap()
                 .split(' ')
                 .collect();
-            if exclude == true {
+            if exclude {
                 if (!class_set.contains(v[0]) && ratio_set.is_empty())
                     || !(class_set.contains(v[0]) && ratio_set.contains(v[0]))
                 {
@@ -452,8 +446,8 @@ pub fn read_filter_pe_nt(
                             gz1.write_all(
                                 format!(
                                     ">{}\n{}\n",
-                                    std::str::from_utf8(&seqrec1.id()).unwrap().to_string(),
-                                    std::str::from_utf8(&seqrec1.raw_seq()).unwrap().to_string()
+                                    std::str::from_utf8(seqrec1.id()).unwrap(),
+                                    std::str::from_utf8(seqrec1.raw_seq()).unwrap()
                                 )
                                 .as_bytes(),
                             )
@@ -461,8 +455,8 @@ pub fn read_filter_pe_nt(
                             gz2.write_all(
                                 format!(
                                     ">{}\n{}\n",
-                                    std::str::from_utf8(&seqrec2.id()).unwrap().to_string(),
-                                    std::str::from_utf8(&seqrec2.raw_seq()).unwrap().to_string()
+                                    std::str::from_utf8(seqrec2.id()).unwrap(),
+                                    std::str::from_utf8(seqrec2.raw_seq()).unwrap()
                                 )
                                 .as_bytes(),
                             )
@@ -472,11 +466,10 @@ pub fn read_filter_pe_nt(
                             gz1.write_all(
                                 format!(
                                     "@{}\n{}\n+\n{}\n",
-                                    std::str::from_utf8(&seqrec1.id()).unwrap().to_string(),
-                                    std::str::from_utf8(&seqrec1.raw_seq()).unwrap().to_string(),
-                                    std::str::from_utf8(&seqrec1.qual().unwrap())
+                                    std::str::from_utf8(seqrec1.id()).unwrap(),
+                                    std::str::from_utf8(seqrec1.raw_seq()).unwrap(),
+                                    std::str::from_utf8(seqrec1.qual().unwrap())
                                         .unwrap()
-                                        .to_string()
                                 )
                                 .as_bytes(),
                             )
@@ -484,11 +477,10 @@ pub fn read_filter_pe_nt(
                             gz2.write_all(
                                 format!(
                                     "@{}\n{}\n+\n{}\n",
-                                    std::str::from_utf8(&seqrec2.id()).unwrap().to_string(),
-                                    std::str::from_utf8(&seqrec2.raw_seq()).unwrap().to_string(),
-                                    std::str::from_utf8(&seqrec2.qual().unwrap())
+                                    std::str::from_utf8(seqrec2.id()).unwrap(),
+                                    std::str::from_utf8(seqrec2.raw_seq()).unwrap(),
+                                    std::str::from_utf8(seqrec2.qual().unwrap())
                                         .unwrap()
-                                        .to_string()
                                 )
                                 .as_bytes(),
                             )
@@ -498,18 +490,17 @@ pub fn read_filter_pe_nt(
                     //record1.unwrap().write(&gz1, Some(record1.unwrap().line_ending()));
                     excluded += 1;
                 }
-            } else {
-                if (class_set.contains(v[0]) && ratio_set.is_empty())
+            } else if (class_set.contains(v[0]) && ratio_set.is_empty())
                     || (class_set.is_empty() && ratio_set.contains(v[0]))
                     || (class_set.contains(v[0]) && ratio_set.contains(v[0]))
-                {
+            {
                     match seqrec1.format() {
                         needletail::parser::Format::Fasta => {
                             gz1.write_all(
                                 format!(
                                     ">{}\n{}\n",
-                                    std::str::from_utf8(&seqrec1.id()).unwrap().to_string(),
-                                    std::str::from_utf8(&seqrec1.raw_seq()).unwrap().to_string()
+                                    std::str::from_utf8(seqrec1.id()).unwrap(),
+                                    std::str::from_utf8(seqrec1.raw_seq()).unwrap()
                                 )
                                 .as_bytes(),
                             )
@@ -517,8 +508,8 @@ pub fn read_filter_pe_nt(
                             gz2.write_all(
                                 format!(
                                     ">{}\n{}\n",
-                                    std::str::from_utf8(&seqrec2.id()).unwrap().to_string(),
-                                    std::str::from_utf8(&seqrec2.raw_seq()).unwrap().to_string()
+                                    std::str::from_utf8(seqrec2.id()).unwrap(),
+                                    std::str::from_utf8(seqrec2.raw_seq()).unwrap()
                                 )
                                 .as_bytes(),
                             )
@@ -528,11 +519,10 @@ pub fn read_filter_pe_nt(
                             gz1.write_all(
                                 format!(
                                     "@{}\n{}\n+\n{}\n",
-                                    std::str::from_utf8(&seqrec1.id()).unwrap().to_string(),
-                                    std::str::from_utf8(&seqrec1.raw_seq()).unwrap().to_string(),
-                                    std::str::from_utf8(&seqrec1.qual().unwrap())
+                                    std::str::from_utf8(seqrec1.id()).unwrap(),
+                                    std::str::from_utf8(seqrec1.raw_seq()).unwrap(),
+                                    std::str::from_utf8(seqrec1.qual().unwrap())
                                         .unwrap()
-                                        .to_string()
                                 )
                                 .as_bytes(),
                             )
@@ -540,11 +530,10 @@ pub fn read_filter_pe_nt(
                             gz2.write_all(
                                 format!(
                                     "@{}\n{}\n+\n{}\n",
-                                    std::str::from_utf8(&seqrec2.id()).unwrap().to_string(),
-                                    std::str::from_utf8(&seqrec2.raw_seq()).unwrap().to_string(),
-                                    std::str::from_utf8(&seqrec2.qual().unwrap())
+                                    std::str::from_utf8(seqrec2.id()).unwrap(),
+                                    std::str::from_utf8(seqrec2.raw_seq()).unwrap(),
+                                    std::str::from_utf8(seqrec2.qual().unwrap())
                                         .unwrap()
-                                        .to_string()
                                 )
                                 .as_bytes(),
                             )
@@ -555,11 +544,10 @@ pub fn read_filter_pe_nt(
                     included += 1;
                 }
             }
-        }
     }
     gz1.finish().expect("Could not close new R1 file");
     gz2.finish().expect("Could not close new R2 file");
-    if exclude == true {
+    if exclude {
         eprintln!(
             "Excluded {} read pairs  with classification containing '{}' from output files",
             total - excluded,

@@ -6,8 +6,10 @@ use needletail::parse_fastx_file;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 
+use dashmap::DashMap;
 use hashbrown::HashMap;
 use rayon::prelude::*;
+use smallvec::SmallVec;
 use std;
 
 use std::collections::VecDeque;
@@ -109,10 +111,10 @@ fn sliding_window_minimizers_sepia_prehll(
     let capacity_db = db.len();
     let l_r = kmer::revcomp(seq);
     //let mut all_kmers = Vec::new();
-    let mut report: HashMap<u32, usize> = HashMap::default();
+    let mut report: DashMap<u32, usize> = DashMap::new();
     let mut report_kmers: Vec<(u32, u64)> = Vec::new();
     let mut observations = 0;
-    let mut window: VecDeque<(u64, usize)> = VecDeque::new(); //position minimizer
+    let mut window: SmallVec<[(u64, usize); 32]> = SmallVec::new(); //position minimizer
     let mut taxon = 0;
     let mut current_minimizer: u64 = 0;
     let length = seq.len();
@@ -145,14 +147,15 @@ fn sliding_window_minimizers_sepia_prehll(
                 //candidate &= seed;
                 let mut minimizer = kmer::canonical(candidate, mmer_size);
                 minimizer ^= toggle;
-                while !window.is_empty() && window.back().unwrap().0 > minimizer {
-                    window.pop_back(); // we pop the last one
+                // Remove elements from the back that are greater than the current minimizer
+                while !window.is_empty() && window[window.len() - 1].0 > minimizer {
+                    window.pop();
                 }
-                window.push_back((minimizer, mmer_counter)); // and make add a pair with the new value at the end
-                while (window.front().unwrap().1 as isize)
-                    < mmer_counter as isize - kmer_size as isize + mmer_size as isize
-                {
-                    window.pop_front(); // pop the first one
+                window.push((minimizer, mmer_counter));
+                // Remove elements from the front that are outside the window
+                let window_start = mmer_counter as isize - kmer_size as isize + mmer_size as isize;
+                while !window.is_empty() && (window[0].1 as isize) < window_start {
+                    window.remove(0);
                 }
                 if mmer_counter >= kmer_size {
                     //println!("{}", canonical_kmer);
@@ -161,17 +164,15 @@ fn sliding_window_minimizers_sepia_prehll(
                         &seq[index..index + kmer_size],
                         &l_r[length - (index + kmer_size)..length - index],
                     );
-                    if current_minimizer == window.front().unwrap().0 {
-                        let count = report.entry(taxon).or_insert(0);
-                        *count += 1;
+                    if current_minimizer == window[0].0 {
+                        *report.entry(taxon).or_insert(0) += 1;
                         report_kmers.push((taxon, seahash::hash(canonical_kmer.as_bytes())));
                     } else {
                         taxon =
-                            get_sepia(&(window.front().unwrap().0 ^ toggle), db, capacity_db, bits);
-                        let count = report.entry(taxon).or_insert(0);
-                        *count += 1;
+                            get_sepia(&(window[0].0 ^ toggle), db, capacity_db, bits);
+                        *report.entry(taxon).or_insert(0) += 1;
                         report_kmers.push((taxon, seahash::hash(canonical_kmer.as_bytes())));
-                        current_minimizer = window.front().unwrap().0;
+                        current_minimizer = window[0].0;
                     }
                     observations += 1;
                 }

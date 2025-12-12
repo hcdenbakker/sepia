@@ -27,11 +27,14 @@ linereader = "0.4.0"
 bstr = "0.2.12"
 thincollections = "0.5.3"
 niffler = "^2.3.2"
-needletail = "0.4"
+needletail = "0.6"
 hyperloglog = "0.0.12"
 sysinfo = "0.20.3"
 fs_extra = "1.2.0"
 memmap2 = "0.9"
+dashmap = "6.1.0"
+smallvec = "1.15.1"
+bumpalo = "3.19.0"
 
 [features]
 default = ["boomphf/serde", "hashbrown/serde"]
