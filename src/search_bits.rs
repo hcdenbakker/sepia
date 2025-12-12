@@ -7,11 +7,11 @@ use super::build_index::Parameters;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 
-use dashmap::DashMap;
 use hashbrown::HashMap;
 use rayon::prelude::*;
-use smallvec::SmallVec;
 use std;
+
+use std::collections::VecDeque;
 
 use std::fs::File;
 
@@ -26,35 +26,6 @@ use sdset::Set;
 
 const TOGGLE: u64 = 0xe37e28c4271b5a2d;
 
-/// SIMD-accelerated batch nucleotide processing for better performance
-#[inline]
-fn process_sequence_batch(seq: &str, k: usize, m: usize) -> impl Iterator<Item = (u64, usize)> + '_ {
-    seq.as_bytes()
-        .windows(m)
-        .enumerate()
-        .filter_map(move |(pos, window)| {
-            let mut candidate: u64 = 0;
-            let mut valid = true;
-
-            // SIMD-accelerated nucleotide conversion
-            let nuc_values = kmer::nuc_to_number_simd(window);
-
-            for &val in &nuc_values {
-                if val >= 4 {
-                    valid = false;
-                    break;
-                }
-                candidate = (candidate << 2) | val;
-            }
-
-            if valid {
-                Some((kmer::canonical(candidate, m), pos))
-            } else {
-                None
-            }
-        })
-}
-
 #[inline]
 fn sliding_window_minimizers_phf_vec(
     seq: &str,
@@ -64,10 +35,9 @@ fn sliding_window_minimizers_phf_vec(
     db: &[u32],
     phf: &Mphf<u64>,
 ) -> (Vec<(u32, usize)>, usize) {
-    let report: DashMap<u32, usize> = DashMap::new();
+    let mut report: HashMap<u32, usize> = HashMap::default();
     let mut observations = 0;
-    let mut window: SmallVec<[(u64, usize); 32]> = SmallVec::new(); // SmallVec for cache-friendly small windows
-    let mut window_start = 0; // Track the start of the window
+    let mut window: VecDeque<(u64, usize)> = VecDeque::new(); //position minimizer
     let mut taxon = 0;
     let mut current_minimizer: u64 = 0;
     let mut counter = 0;
@@ -89,24 +59,24 @@ fn sliding_window_minimizers_phf_vec(
                 //candidate &= seed;
                 let mut minimizer = kmer::canonical(candidate, m);
                 minimizer ^= toggle;
-                // Remove elements from back that are larger than current minimizer
-                while window.len() > window_start && window[window.len() - 1].0 > minimizer {
-                    window.pop();
+                while !window.is_empty() && window.back().unwrap().0 > minimizer {
+                    window.pop_back(); // we pop the last one
                 }
-                window.push((minimizer, i));
-                // Remove elements from front that are outside the window
-                while window.len() > window_start && (window[window_start].1 as isize) < i as isize - k as isize + m as isize {
-                    window_start += 1;
+                window.push_back((minimizer, i)); // and make add a pair with the new value at the end
+                while (window.front().unwrap().1 as isize) < i as isize - k as isize + m as isize {
+                    window.pop_front(); // pop the first one
                 }
                 if i >= k {
-                    if current_minimizer == window[window_start].0 ^ toggle {
+                    if current_minimizer == window.front().unwrap().0 ^ toggle {
                         //    continue
-                        *report.entry(taxon).or_insert(0) += 1;
+                        let count = report.entry(taxon).or_insert(0);
+                        *count += 1;
                     } else {
                         //continue
-                        taxon = get_phf(&(window[window_start].0 ^ toggle), db, phf, b);
-                        *report.entry(taxon).or_insert(0) += 1;
-                        current_minimizer = window[window_start].0;
+                        taxon = get_phf(&(window.front().unwrap().0 ^ toggle), db, phf, b);
+                        let count = report.entry(taxon).or_insert(0);
+                        *count += 1;
+                        current_minimizer = window.front().unwrap().0;
                     }
                     observations += 1;
                 }
@@ -117,7 +87,6 @@ fn sliding_window_minimizers_phf_vec(
             i = 0;
             candidate = 0;
             window.clear();
-            window_start = 0;
         }
         // }
         //if i == length {

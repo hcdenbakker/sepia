@@ -97,7 +97,7 @@ fi
 
 #single end read classification
 print_separator " [3] Classifying single end reads"
-./target/release/sepia classify -i ./demo_index -q ./1000K_test_fq/Ecoli1_1000K_1.fastq.gz -o test_classify -p $THREADS
+./target/release/sepia classify -i ./demo_index -q ./1000K_test_fq/Ecoli1_1000K_1.fastq.gz -n test_classify -t $THREADS
 if [ $? -gt 0 ]; then
   echo "ERROR classifying reads ./test_data/SRR548019.fastq.gz with ./test_data/phage.bxi"
   exit 1
@@ -105,7 +105,7 @@ fi
 
 #paired end read classification
 print_separator " [4] Classifying paired-end reads"
-./target/release/sepia classify -i ./demo_index -q ./1000K_test_fq/Ecoli1_1000K_*.fastq.gz -o test_classify -p $THREADS
+./target/release/sepia classify -i ./demo_index -q ./1000K_test_fq/Ecoli1_1000K_*.fastq.gz -n test_classify -t $THREADS
 if [ $? -gt 0 ]; then
   echo "ERROR classifying reads ./test_data/SRR548019.fastq.gz with ./test_data/phage.bxi"
   exit 1
@@ -130,7 +130,7 @@ echo " [OK] All fields matched!"
 
 #paired end read batch classification (TODO)
 print_separator " [6] Classifying paired-end reads"
-./target/release/sepia batch_classify -i ./demo_index -q batch_example.txt -t batch_example -p $THREADS
+./target/release/sepia batch_classify -i ./demo_index -q batch_example.txt -T batch_example -t $THREADS
 if [ $? -gt 0 ]; then
   echo "ERROR batch classifying reads batch_example.txt with demo_index"
   exit 1

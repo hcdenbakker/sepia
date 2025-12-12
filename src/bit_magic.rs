@@ -37,11 +37,13 @@ pub fn second_hash(first_hash: u64) -> u64 {
 pub fn get_phf(key: &u64, table: &[u32], phf: &Mphf<u64>, value_bits: u32) -> u32 {
     //let hc = seahash::hash(&key.as_bytes());
     let x = phf.try_hash(key);
-    if let Some(idx) = x {
+    if x.is_none() {
+        0_u32
+    } else {
         //let compacted_key = (key >> (32 + value_bits)) as u32;
         //we flip this around
         let compacted_key = ((key << value_bits) as u32) >> value_bits;
-        let idx = idx as usize;
+        let idx = x.unwrap() as usize;
         if value(table[idx], value_bits) == 0 {
             //we do not expect this to happen
             0_u32
@@ -50,8 +52,6 @@ pub fn get_phf(key: &u64, table: &[u32], phf: &Mphf<u64>, value_bits: u32) -> u3
         } else {
             0_u32
         }
-    } else {
-        0_u32
     }
 }
 
@@ -100,7 +100,7 @@ pub fn murmurhash3(key: &u64) -> u64 {
     k
 }
 
-pub fn compare_and_store(table: &mut [u64], key: u64, capacity: usize) -> bool {
+pub fn compare_and_store(table: &mut Vec<u64>, key: u64, capacity: usize) -> bool {
     let hc = seahash::hash(&key.to_ne_bytes());
     let mut set_successful = false;
     let mut search_successful = false;
@@ -189,8 +189,10 @@ pub fn compare_and_set_phf_u32(
     //let hc = seahash::hash(&key.to_ne_bytes());
     let x = phf.try_hash(&key);
     let mut set_successful = false;
-    if let Some(idx) = x {
-        let idx = idx as usize;
+    if x.is_none() {
+        false
+    } else {
+        let idx = x.unwrap() as usize;
         //let compacted_key = (key >> (32 + value_bits)) as u32;
         //we flip this around
         let compacted_key = ((key << value_bits) as u32) >> value_bits;
@@ -226,13 +228,11 @@ pub fn compare_and_set_phf_u32(
             }
         }
         set_successful
-    } else {
-        false
     }
 }
 
 pub fn compare_and_set_sepia(
-    table: &mut [u32],
+    table: &mut Vec<u32>,
     unclassified: u32,
     lineage_graph: &HashMap<u32, u32>,
     key: u64,

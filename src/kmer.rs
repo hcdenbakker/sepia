@@ -7,10 +7,6 @@ use std::collections::VecDeque;
 use std::fs::File;
 use std::io::prelude::*;
 
-// SIMD-accelerated nucleotide processing
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use std::simd::{u8x32, SimdUint};
-
 pub fn read_fasta(filename: String) -> Vec<String> {
     let mut f = File::open(filename).expect("file not found");
     let mut contents = String::new();
@@ -58,7 +54,7 @@ pub fn kmerize_string_set(l: &str, k: usize) -> fnv::FnvHashSet<std::string::Str
         return set;
     } else {
         for i in 0..l.len() - k + 1 {
-            if seq::has_no_n(&l.as_bytes()[i..i + k]) {
+            if seq::has_no_n(l[i..i + k].as_bytes()) {
                 set.insert(min(&l[i..i + k], &l_r[length_l - (i + k)..length_l - i]).to_string());
             }
         }
@@ -76,7 +72,7 @@ pub fn kmerize_string_set_zeroth(l: &str, k: usize) -> fnv::FnvHashSet<u64> {
         return set;
     } else {
         for i in 0..l.len() - k + 1 {
-            if seq::has_no_n(&l.as_bytes()[i..i + k]) {
+            if seq::has_no_n(l[i..i + k].as_bytes()) {
                 let hash = seahash::hash(
                     min(&l[i..i + k], &l_r[length_l - (i + k)..length_l - i])
                         .to_string()
@@ -133,7 +129,7 @@ pub fn sliding_window_minimizers(
         while (window.front().unwrap().1 as isize) < (i as isize - k as isize + m as isize) {
             window.pop_front();
         }
-        if i >= k - m && seq::has_no_n(&seq.as_bytes()[i - (k - m)..i + m]) {
+        if i >= k - m && seq::has_no_n(seq[i - (k - m)..i + m].as_bytes()) {
             mset.insert(window.front().unwrap().0.to_string().to_uppercase());
         }
     }
@@ -162,7 +158,7 @@ pub fn sliding_window_minimizersi_zeroth(
             while (window.front().unwrap().1 as isize) < i as isize - k as isize + m as isize {
                 window.pop_front();
             }
-            if i >= k - m && seq::has_no_n(&seq.as_bytes()[i - (k - m)..i + m]) {
+            if i >= k - m && seq::has_no_n(seq[i - (k - m)..i + m].as_bytes()) {
                 let hash = seahash::hash(
                     window
                         .front()
@@ -199,43 +195,6 @@ pub fn nuc_to_number(nuc: u8) -> u64 {
     NUC_TO_NUMBER[nuc as usize]
 }
 
-/// SIMD-accelerated nucleotide conversion for sequences
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[inline]
-pub fn nuc_to_number_simd(sequence: &[u8]) -> Vec<u64> {
-    use std::simd::{u8x32, SimdUint};
-
-    let mut result = Vec::with_capacity((sequence.len() + 31) / 32 * 32);
-
-    // Process in chunks of 32 nucleotides
-    for chunk in sequence.chunks(32) {
-        if chunk.len() == 32 {
-            let vec = u8x32::from_array(*chunk.first_chunk::<32>().unwrap());
-            // SIMD lookup using shuffle operations would be ideal here,
-            // but for simplicity, we'll use a mapping approach
-            let mapped = vec.map(|x| NUC_TO_NUMBER[x as usize] as u8);
-            // Convert back to u64 values
-            for &val in mapped.to_array() {
-                result.push(val as u64);
-            }
-        } else {
-            // Handle remainder
-            for &nuc in chunk {
-                result.push(NUC_TO_NUMBER[nuc as usize]);
-            }
-        }
-    }
-
-    result
-}
-
-/// Fallback for non-x86 architectures
-#[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
-#[inline]
-pub fn nuc_to_number_simd(sequence: &[u8]) -> Vec<u64> {
-    sequence.iter().map(|&nuc| NUC_TO_NUMBER[nuc as usize]).collect()
-}
-
 /*
 #[inline(always)]
 pub fn nuc_to_number(x: u8) -> u64 {
@@ -261,7 +220,7 @@ fn reverse_complement(kmer: u64, kmer_size: usize) -> u64 {
     // swap consecutive byte pairs
     kmer = ((kmer & 0xFFFF0000FFFF0000) >> 16) | ((kmer & 0x0000FFFF0000FFFF) << 16);
     // swap halves of 64-bit word
-    kmer = kmer.rotate_left(32);
+    kmer = (kmer >> 32) | (kmer << 32);
     // Then complement
     ((!kmer) >> (8 * 8 - kmer_size * 2)) & (((1_u64) << (kmer_size * 2)) - 1)
 }
@@ -306,7 +265,7 @@ pub fn sliding_window_minimizers_skip_n_u64(seq: &str, k: usize, m: usize) -> Ve
                     window.pop_front(); // pop the first one
                 }
                 if i >= k {
-                    //if has_no_n(&&seq.as_bytes()[i - (k - m)..i + m]) {
+                    //if has_no_n(&seq[i - (k - m)..i + m].as_bytes()) {
                     //we do not want to include minimers from kmers with an N
                     //change minimizer into u64
                     vec.push(window.front().unwrap().0 ^ toggle);
@@ -374,7 +333,7 @@ pub fn sliding_window_numerical_zeroth(
                             window.pop_front(); // pop the first one
                         }
                         if i >= k {
-                            //if has_no_n(&&seq.as_bytes()[i - (k - m)..i + m]) {
+                            //if has_no_n(&seq[i - (k - m)..i + m].as_bytes()) {
                             //we do not want to include minimers from kmers with an N
                             //change minimizer into u64
                             //vec.push(window.front().unwrap().0);
@@ -463,7 +422,7 @@ pub fn sliding_window_zeroth_nt(v: &String, k: usize, m: usize) -> std::collecti
                                 window.pop_front(); // pop the first one
                             }
                             if i >= k {
-                                //if has_no_n(&&seq.as_bytes()[i - (k - m)..i + m]) {
+                                //if has_no_n(&seq[i - (k - m)..i + m].as_bytes()) {
                                 //we do not want to include minimers from kmers with an N
                                 //change minimizer into u64
                                 //vec.push(window.front().unwrap().0);

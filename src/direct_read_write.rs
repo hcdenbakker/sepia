@@ -12,7 +12,7 @@ use memmap2::Mmap;
 
 fn as_u8_slice(v: &[u32]) -> &[u8] {
     let element_size = mem::size_of::<u32>();
-    unsafe { slice::from_raw_parts(v.as_ptr() as *const u8, std::mem::size_of_val(v)) }
+    unsafe { slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * element_size) }
 }
 
 fn from_u8(v: Vec<u8>) -> Vec<u16> {
