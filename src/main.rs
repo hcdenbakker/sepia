@@ -468,10 +468,9 @@ fn main() {
         let ram = sys_info.total_memory();
         if index_size as f64 / 1024.0 > ram as f64 {
             eprintln!(
-                "Memory size {} KB is not enough to load an index of {:.3} KB; Abort!",
-                ram, index_size
+                "Warning: Index size {:.3} KB exceeds available RAM {} KB. Using memory mapping; performance may be slower.",
+                index_size as f64 / 1024.0, ram
             );
-            process::abort();
         }
         //detect format; we determine if we have fasta or fastq, or throw an errer if we cannot
         //recognize the format, or if we have a mix of fasta and fastq
@@ -502,7 +501,8 @@ fn main() {
             sepia::build_index::read_parameters_phf(&(index.to_owned() + "/parameters"));
         if parameters.mode == *"boom" {
             eprintln!("Index with perfect hash function detected!");
-            let db = direct_read_write::do_read_u32(&(index.to_owned() + "/db_phf.dump"));
+            let db_mmap = direct_read_write::do_read_u32_mmap(&(index.to_owned() + "/db_phf.dump"));
+            let db = direct_read_write::mmap_as_u32_slice(&db_mmap);
             let mut reader = BufReader::new(
                 File::open(&(index.to_owned() + "/lineages")).expect("Can't open index!"),
             );
@@ -591,7 +591,8 @@ fn main() {
             };
         } else {
             eprintln!("Index with default hash function assumed!");
-            let db = direct_read_write::do_read_u32(&(index.to_owned() + "/db_sepia.dump"));
+            let db_mmap = direct_read_write::do_read_u32_mmap(&(index.to_owned() + "/db_sepia.dump"));
+            let db = direct_read_write::mmap_as_u32_slice(&db_mmap);
             match bigsi_time.elapsed() {
                 Ok(elapsed) => {
                     eprintln!("Index loaded in {} seconds", elapsed.as_secs());
@@ -679,15 +680,15 @@ fn main() {
         let ram = sys_info.total_memory();
         if index_size as f64 / 1024.0 > ram as f64 {
             eprintln!(
-                "Memory size {} KB is not enough to load an index of {:.3} KB; Abort!",
-                ram, index_size
+                "Warning: Index size {:.3} KB exceeds available RAM {} KB. Using memory mapping; performance may be slower.",
+                index_size as f64 / 1024.0, ram
             );
-            process::abort();
         }
         let parameters =
             sepia::build_index::read_parameters_phf(&(index.to_owned() + "/parameters"));
         if parameters.mode == "boom" {
-            let db = direct_read_write::do_read_u32(&(index.to_owned() + "/db_phf.dump"));
+            let db_mmap = direct_read_write::do_read_u32_mmap(&(index.to_owned() + "/db_phf.dump"));
+            let db = direct_read_write::mmap_as_u32_slice(&db_mmap);
             let parameters =
                 sepia::build_index::read_parameters_phf(&(index.to_owned() + "/parameters"));
 
@@ -718,7 +719,8 @@ fn main() {
                 gzip_output,
             );
         } else {
-            let db = direct_read_write::do_read_u32(&(index.to_owned() + "/db_sepia.dump"));
+            let db_mmap = direct_read_write::do_read_u32_mmap(&(index.to_owned() + "/db_sepia.dump"));
+            let db = direct_read_write::mmap_as_u32_slice(&db_mmap);
             let parameters =
                 sepia::build_index::read_parameters_phf(&(index.to_owned() + "/parameters"));
 

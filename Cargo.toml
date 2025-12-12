@@ -31,6 +31,7 @@ needletail = "0.4"
 hyperloglog = "0.0.12"
 sysinfo = "0.20.3"
 fs_extra = "1.2.0"
+memmap2 = "0.9"
 
 [features]
 default = ["boomphf/serde", "hashbrown/serde"]

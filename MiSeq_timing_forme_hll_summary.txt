@@ -1,0 +1,20 @@
+no hits	7869552	0.000	1149026868	120626812	9.525	105405815	9.640
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia sp001660175	47310	0.159	540352	38103	14.181	807543	6.711
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia marmotae	50771	0.159	595417	42171	14.119	870374	6.694
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia coli_D	13838	0.229	240359	18882	12.730	244856	6.414
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia flexneri	13684	0.405	472435	32521	14.527	228866	6.967
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Salmonella;s__Salmonella enterica_D	71414	0.443	1665166	107619	15.473	1306979	6.400
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Salmonella;s__Salmonella enterica	683049	0.720	24706793	1399504	17.654	8908698	9.216
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia fergusonii	46771	0.231	849013	59872	14.180	773886	6.869
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia coli_C	17578	0.180	238134	18364	12.967	300656	6.652
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia dysenteriae	10024	0.212	119750	13580	8.818	199655	5.877
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia	272463	0.203	6445135	504228	12.782	4616511	6.676
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Salmonella;s__Salmonella enterica_E	78091	0.371	1513897	106922	14.159	1415176	6.397
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Salmonella	359407	0.473	55640410	3145006	17.692	7101105	5.899
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia sp002965065	34877	0.203	488916	34392	14.216	581366	6.903
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia sp000208585	37729	0.157	438853	30522	14.378	650279	6.605
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia albertii	66566	0.289	1835706	100278	18.306	1069173	7.154
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia coli	14236	0.181	178909	13846	12.921	249127	6.613
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Salmonella;s__Salmonella bongori	102974	0.261	1650954	127109	12.988	1823126	6.469
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Salmonella;s__Salmonella enterica_C	70317	0.464	1746967	109109	16.011	1314210	6.308
+root;d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae	139349	0.285	17637627	673299	26.196	2448938	6.982

@@ -8,6 +8,7 @@ use std::io::{Read, Write};
 use std::{mem, slice};
 
 use std::io::BufWriter;
+use memmap2::Mmap;
 
 fn as_u8_slice(v: &[u32]) -> &[u8] {
     let element_size = mem::size_of::<u32>();
@@ -83,6 +84,19 @@ pub fn do_read_u32(filename: &str) -> Vec<u32> {
     f.read_to_end(&mut bytes).unwrap();
 
     from_u8_to_u32(bytes)
+}
+
+pub fn do_read_u32_mmap(filename: &str) -> Mmap {
+    let file = File::open(filename).unwrap();
+    unsafe { Mmap::map(&file).unwrap() }
+}
+
+pub fn mmap_as_u32_slice(mmap: &Mmap) -> &[u32] {
+    let data = mmap.as_ptr();
+    let len = mmap.len();
+    let element_size = mem::size_of::<u32>();
+    assert_eq!(len % element_size, 0);
+    unsafe { slice::from_raw_parts(data as *const u32, len / element_size) }
 }
 
 pub fn do_write_little_endian(filename: &str, v: &[u16]) {
