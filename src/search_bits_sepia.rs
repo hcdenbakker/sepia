@@ -25,6 +25,8 @@ use sdset::Set;
 
 use hyperloglog::HyperLogLog;
 use std::cmp::min;
+use crate::hll_pool;
+use crate::io_writer;
 
 const TOGGLE: u64 = 0xe37e28c4271b5a2d;
 
@@ -341,13 +343,19 @@ pub fn poll_lineages_vec_u32(
         if key.0 == (0_u32) || key.0 == unclassified {
             continue;
         } else {
-            let slice_a = &super::taxonomy_u32::get_lineage_graph(key.0, lineage_graph)[..];
-            let lineage1 = Set::new(slice_a).expect("could not create set1");
+            // aggregate counts for taxa that share the same parent lineage
+            let parent = match lineage_graph.get(&key.0) {
+                Some(p) => *p,
+                None => key.0,
+            };
             for key2 in report {
                 if key2.0 == (0_u32) || key2.0 == unclassified {
                     continue;
-                } else if lineage1.contains(&key2.0) {
-                    score += key2.1;
+                } else {
+                    let lineage_b = super::taxonomy_u32::get_lineage_graph(key2.0, lineage_graph);
+                    if lineage_b.contains(&parent) {
+                        score += key2.1;
+                    }
                 }
             }
         }
@@ -626,6 +634,8 @@ pub fn per_read_stream_not_parallel(
     let search_time = SystemTime::now();
     //let mut results = Vec::new();
     let mut results: Vec<u8> = Vec::new();
+    let mut writer_tx: Option<std::sync::mpsc::Sender<Vec<u8>>> = None;
+    let mut writer_handle: Option<std::thread::JoinHandle<()>> = None;
     //let mut results = Vec::new();
     let mut reader1 = parse_fastx_file(&filenames[0]).expect("invalid path/file");
     let mut read_count = 0;
@@ -717,6 +727,16 @@ pub fn per_read_stream_se(
     let mut hll_map_taxon: HashMap<u32, HyperLogLog<u64>> = HashMap::new();
     let mut final_counts_taxon: HashMap<u32, usize> = HashMap::new(); //actually counts of minimizers
     let mut vec = Vec::with_capacity(batch_size);
+    let mut writer_tx: Option<std::sync::mpsc::Sender<Vec<u8>>> = None;
+    let mut writer_handle: Option<std::thread::JoinHandle<()>> = None;
+    if hll {
+        hll_pool::init_pool(64);
+    }
+    if compressed_output {
+        let (tx, h) = io_writer::start_writer_thread(format!("{}_classification.gz", prefix), true);
+        writer_tx = Some(tx);
+        writer_handle = Some(h);
+    }
     //let mut results = Vec::new();
     let mut reader1 = parse_fastx_file(&filenames[0]).expect("invalid path/file");
     let mut read_count = 0;
@@ -763,20 +783,14 @@ pub fn per_read_stream_se(
                 }
                 if hll {
                     for f in &id.5 {
-                        if hll_map_taxon.contains_key(&id.1) {
-                            hll_map_taxon.get_mut(&id.1).unwrap().insert(&f.1);
-                        } else {
-                            let mut hllp = HyperLogLog::new(0.001);
-                            hllp.insert(&f.1);
-                            hll_map_taxon.insert(id.1, hllp);
-                        }
-                        if hll_map.contains_key(&f.0) {
-                            hll_map.get_mut(&f.0).unwrap().insert(&f.1);
-                        } else {
-                            let mut hllp = HyperLogLog::new(0.001);
-                            hllp.insert(&f.1);
-                            hll_map.insert(f.0, hllp);
-                        }
+                        hll_map_taxon
+                            .entry(id.1)
+                            .or_insert_with(|| hll_pool::get_hll())
+                            .insert(&f.1);
+                        hll_map
+                            .entry(f.0)
+                            .or_insert_with(|| hll_pool::get_hll())
+                            .insert(&f.1);
                     }
                 }
                 if id.2 == 0 {
@@ -784,9 +798,12 @@ pub fn per_read_stream_se(
                 } else {
                     *results_ratios.entry(id.1).or_insert(0.0) += id.2 as f64 / id.3 as f64;
                 }
-                results.extend(
-                    format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3).as_bytes(),
-                );
+                let line = format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3);
+                if let Some(tx) = &writer_tx {
+                    let _ = tx.send(line.into_bytes());
+                } else {
+                    results.extend(line.as_bytes());
+                }
             }
             vec.clear();
         }
@@ -845,15 +862,19 @@ pub fn per_read_stream_se(
         } else {
             *results_ratios.entry(id.1).or_insert(0.0) += id.2 as f64 / id.3 as f64;
         }
-        results.extend(format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3).as_bytes());
+        let line = format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3);
+        if let Some(tx) = &writer_tx {
+            let _ = tx.send(line.into_bytes());
+        } else {
+            results.extend(line.as_bytes());
+        }
     }
     if compressed_output {
-        let mut file = BufWriter::new(GzEncoder::new(
-            File::create(format!("{}_classification.gz", prefix))
-                .expect("could not create outfile!"),
-            Compression::default(),
-        ));
-        file.write_all(&results).expect("could not write results!");
+        // close sender and wait for writer thread to finish
+        drop(writer_tx);
+        if let Some(h) = writer_handle {
+            let _ = h.join();
+        }
     } else {
         std::fs::write(format!("{}_classification.txt", prefix), &results)
             .expect("Can't write results to file");
@@ -931,6 +952,15 @@ pub fn per_read_stream_se(
             .expect("could not write results!");
         }
     }
+    // return HLLs to pool for reuse
+    if hll {
+        for (_k, h) in hll_map.drain() {
+            hll_pool::put_hll(h);
+        }
+        for (_k, h) in hll_map_taxon.drain() {
+            hll_pool::put_hll(h);
+        }
+    }
 }
 
 //needletail version
@@ -948,12 +978,22 @@ pub fn per_read_stream_pe(
     let mut read_count = 0;
     let mut vec = Vec::with_capacity(batch_size);
     let mut results = Vec::new();
+    let mut writer_tx: Option<std::sync::mpsc::Sender<Vec<u8>>> = None;
+    let mut writer_handle: Option<std::thread::JoinHandle<()>> = None;
     let mut results_counts: HashMap<u32, usize> = HashMap::new();
     let mut results_ratios: HashMap<u32, f64> = HashMap::new();
     let mut results_total_length: HashMap<u32, usize> = HashMap::new();
     let mut final_counts: HashMap<u32, usize> = HashMap::new(); //actually counts of minimizers
     let mut hll_map: HashMap<u32, HyperLogLog<u64>> = HashMap::new();
     let mut hll_map_taxon: HashMap<u32, HyperLogLog<u64>> = HashMap::new();
+    if hll {
+        hll_pool::init_pool(64);
+    }
+    if compressed_output {
+        let (tx, h) = io_writer::start_writer_thread(format!("{}_classification.gz", prefix), true);
+        writer_tx = Some(tx);
+        writer_handle = Some(h);
+    }
     let mut final_counts_taxon: HashMap<u32, usize> = HashMap::new(); //actually counts of minimizers
     let mut reader1 = parse_fastx_file(&filenames[0]).expect("invalid path/file");
     let mut reader2 = parse_fastx_file(&filenames[1]).expect("invalid path/file");
@@ -1012,20 +1052,14 @@ pub fn per_read_stream_pe(
                 }
                 if hll {
                     for f in &id.5 {
-                        if hll_map_taxon.contains_key(&id.1) {
-                            hll_map_taxon.get_mut(&id.1).unwrap().insert(&f.1);
-                        } else {
-                            let mut hllp = HyperLogLog::new(0.001);
-                            hllp.insert(&f.1);
-                            hll_map_taxon.insert(id.1, hllp);
-                        }
-                        if hll_map.contains_key(&f.0) {
-                            hll_map.get_mut(&f.0).unwrap().insert(&f.1);
-                        } else {
-                            let mut hllp = HyperLogLog::new(0.001);
-                            hllp.insert(&f.1);
-                            hll_map.insert(f.0, hllp);
-                        }
+                        hll_map_taxon
+                            .entry(id.1)
+                            .or_insert_with(|| hll_pool::get_hll())
+                            .insert(&f.1);
+                        hll_map
+                            .entry(f.0)
+                            .or_insert_with(|| hll_pool::get_hll())
+                            .insert(&f.1);
                     }
                 }
                 if id.2 == 0 {
@@ -1033,9 +1067,12 @@ pub fn per_read_stream_pe(
                 } else {
                     *results_ratios.entry(id.1).or_insert(0.0) += id.2 as f64 / id.3 as f64;
                 }
-                results.extend(
-                    format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3).as_bytes(),
-                );
+                        let line = format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3);
+                        if let Some(tx) = &writer_tx {
+                            let _ = tx.send(line.into_bytes());
+                        } else {
+                            results.extend(line.as_bytes());
+                        }
             }
             vec.clear();
         }
@@ -1080,7 +1117,12 @@ pub fn per_read_stream_pe(
         } else {
             *results_ratios.entry(id.1).or_insert(0.0) += id.2 as f64 / id.3 as f64;
         }
-        results.extend(format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3).as_bytes());
+        let line = format!("{}\t{}\t{}\t{}\n", id.0, parameters.taxonomy[&id.1], id.2, id.3);
+        if let Some(tx) = &writer_tx {
+            let _ = tx.send(line.into_bytes());
+        } else {
+            results.extend(line.as_bytes());
+        }
     }
     match search_time.elapsed() {
         Ok(elapsed) => {
@@ -1096,12 +1138,10 @@ pub fn per_read_stream_pe(
         }
     }
     if compressed_output {
-        let mut file = BufWriter::new(GzEncoder::new(
-            File::create(format!("{}_classification.gz", prefix))
-                .expect("could not create outfile!"),
-            Compression::default(),
-        ));
-        file.write_all(&results).expect("could not write results!");
+        drop(writer_tx);
+        if let Some(h) = writer_handle {
+            let _ = h.join();
+        }
     } else {
         std::fs::write(format!("{}_classification.txt", prefix), &results)
             .expect("Can't write results to file");
@@ -1177,6 +1217,15 @@ pub fn per_read_stream_pe(
                 .as_bytes(),
             )
             .expect("could not write results!");
+        }
+    }
+    // return HLLs to pool for reuse
+    if hll {
+        for (_k, h) in hll_map.drain() {
+            hll_pool::put_hll(h);
+        }
+        for (_k, h) in hll_map_taxon.drain() {
+            hll_pool::put_hll(h);
         }
     }
 }

@@ -19,6 +19,9 @@ pub mod search_bits;
 
 pub mod search_bits_sepia;
 
+pub mod hll_pool;
+pub mod io_writer;
+
 pub mod direct_read_write;
 
 pub mod classify_batch;

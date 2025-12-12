@@ -1,0 +1,18 @@
+Ref_file : ref_demo.txt
+db : demo_index_profile
+k-mer size: 31
+minimizer size: 21
+hash mode: sepia
+minimizers for 2 samples inferred in parallel.
+length taxonomy: 26, root value: 1
+5 bits reserved to store taxon information.
+Creating index...
+Estimating total number of unique kmers/minimizers...
+2/16 accessions processed.4/16 accessions processed.6/16 accessions processed.8/16 accessions processed.10/16 accessions processed.12/16 accessions processed.14/16 accessions processed.16/16 accessions processed.16 accessions processed.
+Estimated index size: 0.037 Gb
+Estimated number of minimizers: 7013632
+Initial size of compact hash set set to 10019474
+Buidling index...
+Creating final index...
+processed 2/16 accessionsprocessed 4/16 accessionsprocessed 6/16 accessionsprocessed 8/16 accessionsprocessed 10/16 accessionsprocessed 12/16 accessionsprocessed 14/16 accessionsprocessed 16/16 accessionsprocessed 16/16 accessions
+Saving index to file.
